@@ -1,0 +1,24 @@
+{
+    "name": "enhance-data-view",
+    "version": "1.0.0",
+    "description": "Enhance DataView tools.",
+    "main": "index.js",
+    "type": "module",
+    "scripts": {
+        "build": "rollup -c",
+        "type": "tsc --noEmit",
+        "test": "jest"
+    },
+    "keywords": [],
+    "author": "MrKBear <mrkbear@qq.com>",
+    "license": "ISC",
+    "devDependencies": {
+        "@rollup/plugin-typescript": "^12.1.4",
+        "@tsconfig/node-lts": "^22.0.2",
+        "@types/jest": "^30.0.0",
+        "jest": "^30.0.4",
+        "rollup": "^4.44.1",
+        "ts-jest": "^29.4.0",
+        "typescript": "^5.8.3"
+    }
+}
