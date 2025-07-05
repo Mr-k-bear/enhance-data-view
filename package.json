@@ -16,6 +16,7 @@
         "@rollup/plugin-typescript": "^12.1.4",
         "@tsconfig/node-lts": "^22.0.2",
         "@types/jest": "^30.0.0",
+        "@types/node": "^24.0.10",
         "jest": "^30.0.4",
         "rollup": "^4.44.1",
         "ts-jest": "^29.4.0",
