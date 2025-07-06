@@ -553,19 +553,19 @@ export interface StructDefinedContext<T extends Record<StructDefinedKey, any>> e
  * @example
  * ```typescript
  * // Define an empty struct with diagnostic name
- * const empty_struct = definedStructure("my_struct");
+ * const empty_struct = definedStruct("my_struct");
  * ```
  * 
  * @example
  * ```typescript
  * // Define a person struct with multiple fields
- * const person = definedStructure("person")
+ * const person = definedStruct("person")
  *   .addProperty("id", int_32)
  *   .addProperty("name", c_string)
  *   .setAlign(4); // 4-byte alignment
  * ```
  */
-export function definedStructure<T extends Record<StructDefinedKey, any> = {}>(name?: string): StructDefinedContext<T> {
+export function definedStruct<T extends Record<StructDefinedKey, any> = {}>(name?: string): StructDefinedContext<T> {
     const calculateOffset = (property: StructDefinedProperty<any>, offset: number, cached: boolean): number => {
         // Absolute offset
         if (typeof property.offset === "number") {
@@ -786,10 +786,11 @@ export function definedStructure<T extends Record<StructDefinedKey, any> = {}>(n
         );
     }
     const clone: StructDefinedContext<T>["clone"] = (name) => {
-        const newInstance = definedStructure<T>(name ?? context.name);
+        const newInstance = definedStruct<T>(name ?? context.name);
         newInstance.size = context.size;
-        newInstance.littleEndian = context.littleEndian;
         newInstance.align = context.align;
+        newInstance.littleEndian = context.littleEndian;
+        newInstance.maxAlign = context.maxAlign;
         newInstance.properties = context.properties.map(p => ({
             key: p.key,
             type: p.type,
