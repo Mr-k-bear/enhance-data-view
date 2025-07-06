@@ -85,7 +85,7 @@ export type TypeDefinedGetter<T> = (view: DataView, offset: number, littleEndian
  * @param value - The value to write
  * @returns Actual number of bytes written. Only required for dynamic-sized types.
  */
-export type TypeDefinedSetter<T> = (view: DataView, offset: number, littleEndian: boolean | undefined, value: T) => number | undefined | null | void;
+export type TypeDefinedSetter<T> = (view: DataView, offset: number, value: T, littleEndian: boolean | undefined) => number | undefined | null | void;
 
 /**
  * Type descriptor object.
@@ -261,7 +261,7 @@ export function definedType<T = unknown>(name?: string): TypeDefinedContext<T> {
             read: true
         });
     };
-    const setter: TypeDefinedSetter<T> = (view, offset, littleEndian, value) => {
+    const setter: TypeDefinedSetter<T> = (view, offset, value, littleEndian) => {
         throw new TypeOperationError(`[${context}]: Writer function is unset.`, {
             type: context,
             view,
@@ -627,7 +627,7 @@ export function definedStruct<T extends Record<StructDefinedKey, any> = {}>(name
         size(currentOffset);
         return structure;
     };
-    const setter: TypeDefinedSetter<T> = (view, offset, littleEndian, value) => {
+    const setter: TypeDefinedSetter<T> = (view, offset, value, littleEndian) => {
         let staticSize = true;
         let currentOffset = 0;
         for (const property of context.properties) {
@@ -639,7 +639,7 @@ export function definedStruct<T extends Record<StructDefinedKey, any> = {}>(name
             if (!property.padding) {
                 val = value[property.key];
             }
-            const currentSize = property.type.setter(view, of, le, val);
+            const currentSize = property.type.setter(view, of, val, le);
             // Static size
             if (typeof property.type.size === "number") {
                 currentOffset += property.type.size;
