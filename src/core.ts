@@ -104,7 +104,20 @@ export interface TypeDefined<T> extends Object {
      * - For types with runtime-determined sizes (e.g. C-style strings),
      *   use `null` or `undefined` to indicate dynamic sizing
      */
-    size?: number | undefined | null;
+    size?: number | null | undefined;
+    /**
+     * Memory alignment requirement when used as a struct field
+     * 
+     * @remarks
+     * - When unset (`undefined` or `null`):
+     *   - For fixed-size types: Uses the type's `size` as alignment value
+     *   - For dynamic-size types: Defaults to 1 (no alignment)
+     * - When set: Overrides both default behaviors
+     * 
+     * @note Alignment values should be powers of 2 (1, 2, 4, 8...).
+     * Non-power-of-2 values may cause undefined behavior.
+     */
+    align?: number | null | undefined;
     /**
      * Forces little-endian byte order for this type's operations.
      * 
@@ -112,7 +125,7 @@ export interface TypeDefined<T> extends Object {
      * - When `false`: Always uses big-endian
      * - When `null` or `undefined`: Inherits endianness from the current operation context
      */
-    littleEndian?: boolean | undefined | null;
+    littleEndian?: boolean | null | undefined;
     /**
      * Value reader function
      */
@@ -153,12 +166,22 @@ export interface TypeDefinedContext<T> extends TypeDefined<T> {
     /** Alias for {@link setSize} */
     s: TypeDefinedContext<T>["setSize"];
     /**
+     * Sets the default byte alignment for struct fields.
+     * {@link TypeDefined.align}
+     * 
+     * @param align - Alignment value (must be power of 2)
+     * @returns This context
+     */
+    setAlign(align?: number | null | undefined): TypeDefinedContext<T>;
+    /** Alias for {@link setAlign} */
+    a: TypeDefinedContext<T>["setAlign"];
+    /**
      * Sets little-endian byte order.
      * 
      * @param littleEndian - {@link TypeDefined.littleEndian}
      * @returns This context
      */
-    setLittleEndian(littleEndian?: boolean | undefined | null): TypeDefinedContext<T>;
+    setLittleEndian(littleEndian?: boolean | null | undefined): TypeDefinedContext<T>;
     /** Alias for {@link setLittleEndian} */
     l: TypeDefinedContext<T>["setLittleEndian"];
     /**
@@ -256,6 +279,10 @@ export function definedType<T = unknown>(name?: string): TypeDefinedContext<T> {
         context.size = size;
         return context;
     };
+    const setAlign: TypeDefinedContext<T>["setAlign"] = (align) => {
+        context.align = align;
+        return context;
+    };
     const setLittleEndian: TypeDefinedContext<T>["setLittleEndian"] = (littleEndian) => {
         context.littleEndian = littleEndian;
         return context;
@@ -287,6 +314,8 @@ export function definedType<T = unknown>(name?: string): TypeDefinedContext<T> {
         n: setName,
         setSize,
         s: setSize,
+        setAlign,
+        a: setAlign,
         setLittleEndian,
         l: setLittleEndian,
         setGetter,
@@ -337,8 +366,8 @@ export interface StructDefinedProperty<T> {
      * Memory alignment requirement for this property
      * 
      * @remarks
-     * - When unset (`undefined` or `null`), inherits the struct's default alignment
-     * - When set, overrides the struct's default alignment for this property
+     * - When unset (`undefined` or `null`), inherits the type's alignment
+     * - When set, overrides the type's alignment for this property
      * - Affects offset calculation by aligning the property's starting address
      */
     align?: number | undefined | null;
@@ -373,15 +402,21 @@ export interface StructDefinedProperty<T> {
  */
 export interface StructDefinedContext<T extends Record<StructDefinedKey, any>> extends TypeDefined<T> {
     /**
-     * Default byte alignment for all struct fields
+     * Maximum alignment requirement among all struct fields
      * 
-     * @defaultValue 1 (no alignment, tightly packed)
-     * StructDefinedProperty
+     * @internal
+     * 
      * @remarks
-     * Affects automatic offset calculation for subsequent fields.
-     * Individual fields can override this with their own alignment.
+     * - Automatically computed from all fields' effective alignments
+     * - For empty structs, defaults to 1 (no alignment)
+     * - Updated automatically when fields are added, modified or removed
+     * 
+     * @note This value determines:
+     * 1. The struct's overall alignment when used in other structs
+     * 2. The padding needed after the last field
+     * 3. The struct's size when used in arrays
      */
-    align: number;
+    maxAlign: number;
     /**
      * Ordered list of struct field descriptors
      * 
@@ -400,6 +435,16 @@ export interface StructDefinedContext<T extends Record<StructDefinedKey, any>> e
     /** Alias for {@link setName} */
     n: StructDefinedContext<T>["setName"];
     /**
+     * Sets the default byte alignment for struct fields.
+     * {@link TypeDefined.align}
+     * 
+     * @param align - Alignment value (must be power of 2)
+     * @returns This context
+     */
+    setAlign(align?: number | null | undefined): StructDefinedContext<T>;
+    /** Alias for {@link setAlign} */
+    a: StructDefinedContext<T>["setAlign"];
+    /**
      * Sets little-endian byte order.
      * 
      * @param littleEndian - {@link TypeDefined.littleEndian}
@@ -408,16 +453,6 @@ export interface StructDefinedContext<T extends Record<StructDefinedKey, any>> e
     setLittleEndian(littleEndian?: boolean | undefined | null): StructDefinedContext<T>;
     /** Alias for {@link setLittleEndian} */
     l: StructDefinedContext<T>["setLittleEndian"];
-    /**
-     * Sets the default byte alignment for struct fields \
-     * {@link StructDefinedContext.align}
-     * 
-     * @param align - Alignment value (must be power of 2)
-     * @returns This context
-     */
-    setAlign(align: number): StructDefinedContext<T>;
-    /** Alias for {@link setAlign} */
-    a: StructDefinedContext<T>["setAlign"];
     /**
      * Adds a new field to the struct
      * 
@@ -540,41 +575,15 @@ export function definedStructure<T extends Record<StructDefinedKey, any> = {}>(n
         if (typeof property.offsetCache === "number") {
             return property.offsetCache;
         }
-        // Offset calculation
-        let alignedOffset: number;
-        const align = property.align ?? context.align;
-        const remainder = offset % align;
-        if (remainder === 0) {
-            alignedOffset = offset;
-        }
-        else {
-            const padding = align - remainder;
-            alignedOffset = offset + padding;
-        }
+        // Padding calculation
+        const align = Math.max(property.align ?? property.type.align ?? property.type.size ?? 1, 1);
+        const padding = (align - (offset % align)) % align;
+        const alignedOffset = offset + padding;
         // Cached
         if (cached) {
             property.offsetCache = alignedOffset;
         }
         return alignedOffset;
-    };
-    const calculateLayout = () => {
-        let currentOffset: number | undefined = 0;
-        for (const record of context.properties) {
-            record.offsetCache = void 0;
-            if (typeof currentOffset !== "number") {
-                continue;
-            }
-            currentOffset = calculateOffset(record, currentOffset, true);
-            // Static size
-            if (typeof record.type.size === "number") {
-                currentOffset += record.type.size;
-            }
-            // Dynamic size
-            else {
-                currentOffset = void 0;
-            }
-        }
-        context.size = currentOffset;
     };
     const getter: TypeDefinedGetter<T> = (view, offset, littleEndian, size) => {
         const structure: Record<StructDefinedKey, any> = {};
@@ -584,19 +593,19 @@ export function definedStructure<T extends Record<StructDefinedKey, any> = {}>(n
         const sizeCallback = (size: number) => {
             currentSize = size;
         }
-        for (const record of context.properties) {
+        for (const property of context.properties) {
             currentSize = void 0;
-            currentOffset = calculateOffset(record, currentOffset, staticSize);
+            currentOffset = calculateOffset(property, currentOffset, staticSize);
             const of = offset + currentOffset;
-            const le = littleEndian ?? (typeof record.type.littleEndian === "boolean" ? record.type.littleEndian : void 0);
-            const value = record.type.getter(view, of, le, sizeCallback);
+            const le = littleEndian ?? (typeof property.type.littleEndian === "boolean" ? property.type.littleEndian : void 0);
+            const value = property.type.getter(view, of, le, sizeCallback);
             // Padding
-            if (!record.padding) {
-                structure[record.key] = value;
+            if (!property.padding) {
+                structure[property.key] = value;
             }
             // Static size
-            if (typeof record.type.size === "number") {
-                currentOffset += record.type.size;
+            if (typeof property.type.size === "number") {
+                currentOffset += property.type.size;
                 continue;
             }
             // Dynamic size
@@ -605,7 +614,7 @@ export function definedStructure<T extends Record<StructDefinedKey, any> = {}>(n
                 currentOffset += currentSize;
                 continue;
             }
-            const keyString = typeof record.key === "symbol" ? `Symbol(${record.key.description || ""})` : record.key;
+            const keyString = typeof property.key === "symbol" ? `Symbol(${property.key.description || ""})` : property.key;
             throw new TypeOperationError(`[${context} => ${keyString}]: The dynamic-sized types must return its actual size.`, {
                 type: context,
                 view,
@@ -621,19 +630,19 @@ export function definedStructure<T extends Record<StructDefinedKey, any> = {}>(n
     const setter: TypeDefinedSetter<T> = (view, offset, littleEndian, value) => {
         let staticSize = true;
         let currentOffset = 0;
-        for (const record of context.properties) {
-            currentOffset = calculateOffset(record, currentOffset, staticSize);
+        for (const property of context.properties) {
+            currentOffset = calculateOffset(property, currentOffset, staticSize);
             const of = offset + currentOffset;
-            const le = littleEndian ?? (typeof record.type.littleEndian === "boolean" ? record.type.littleEndian : void 0);
+            const le = littleEndian ?? (typeof property.type.littleEndian === "boolean" ? property.type.littleEndian : void 0);
             // Padding
             let val: any = void 0;
-            if (!record.padding) {
-                val = value[record.key];
+            if (!property.padding) {
+                val = value[property.key];
             }
-            const currentSize = record.type.setter(view, of, le, val);
+            const currentSize = property.type.setter(view, of, le, val);
             // Static size
-            if (typeof record.type.size === "number") {
-                currentOffset += record.type.size;
+            if (typeof property.type.size === "number") {
+                currentOffset += property.type.size;
                 continue;
             }
             // Dynamic size
@@ -642,9 +651,9 @@ export function definedStructure<T extends Record<StructDefinedKey, any> = {}>(n
                 currentOffset += currentSize;
                 continue;
             }
-            const keyString = typeof record.key === "symbol" ? `Symbol(${record.key.description || ""})` : record.key;
+            const keyString = typeof property.key === "symbol" ? `Symbol(${property.key.description || ""})` : property.key;
             throw new TypeOperationError(`[${context} => ${keyString}]: The dynamic-sized types must return its actual size.`, {
-                type: record.type,
+                type: property.type,
                 view,
                 offset: of,
                 littleEndian: le,
@@ -654,13 +663,43 @@ export function definedStructure<T extends Record<StructDefinedKey, any> = {}>(n
         }
         return currentOffset;
     };
+    const calculateLayout = () => {
+        let maxAlign: number = 1;
+        let currentOffset: number | undefined = 0;
+        for (const property of context.properties) {
+            // Clear cache
+            property.offsetCache = void 0;
+            // Update max align
+            const align = Math.max(property.align ?? property.type.align ?? property.type.size ?? 1, 1);
+            maxAlign = Math.max(maxAlign, align);
+            // Cache offset
+            if (typeof currentOffset !== "number") {
+                continue;
+            }
+            currentOffset = calculateOffset(property, currentOffset, true);
+            // Static size
+            if (typeof property.type.size === "number") {
+                currentOffset += property.type.size;
+            }
+            // Dynamic size
+            else {
+                currentOffset = void 0;
+            }
+        }
+        // End padding
+        if (typeof currentOffset === "number") {
+            const endPadding = (maxAlign - (currentOffset % maxAlign)) % maxAlign;
+            currentOffset += endPadding;
+        }
+        context.maxAlign = maxAlign;
+        context.size = currentOffset;
+    };
     const setName: StructDefinedContext<T>["setName"] = (name) => {
         context.name = name || context.name;
         return context;
     };
-    const setAlign: StructDefinedContext<T>["setAlign"] = (align: number) => {
+    const setAlign: StructDefinedContext<T>["setAlign"] = (align) => {
         context.align = align;
-        calculateLayout();
         return context;
     };
     const setLittleEndian: StructDefinedContext<T>["setLittleEndian"] = (littleEndian) => {
@@ -669,11 +708,11 @@ export function definedStructure<T extends Record<StructDefinedKey, any> = {}>(n
     };
     const pushProperty = (property: StructDefinedProperty<any>): StructDefinedContext<T> => {
         // Duplicate Check
-        for (const record of context.properties) {
-            if (record.key !== property.key) {
+        for (const prop of context.properties) {
+            if (prop.key !== property.key) {
                 continue;
             }
-            const keyString = typeof record.key === "symbol" ? `Symbol(${record.key.description || ""})` : record.key;
+            const keyString = typeof prop.key === "symbol" ? `Symbol(${prop.key.description || ""})` : prop.key;
             throw new TypeOperationError(
                 `[${context}] Cannot add property "${keyString}" repeatedly. ` +
                 `If you want to modify existing property, please use the "updateProperty()" function`,
@@ -684,13 +723,7 @@ export function definedStructure<T extends Record<StructDefinedKey, any> = {}>(n
             );
         }
         context.properties.push(property);
-        // Update size
-        if (typeof property.type.size !== "number") {
-            context.size = void 0;
-        }
-        else if (typeof context.size === "number") {
-            context.size = calculateOffset(property, context.size, true) + property.type.size;
-        }
+        calculateLayout();
         return context;
     };
     const addProperty: StructDefinedContext<T>["addProperty"] = (key, type, offset, align) => pushProperty({
@@ -707,17 +740,17 @@ export function definedStructure<T extends Record<StructDefinedKey, any> = {}>(n
         padding: true
     });
     const updateProperty: StructDefinedContext<T>["updateProperty"] = (key: StructDefinedKey, type, ...param) => {
-        for (const record of context.properties) {
-            if (record.key !== key) {
+        for (const property of context.properties) {
+            if (property.key !== key) {
                 continue;
             }
             // Update
-            record.type = type;
+            property.type = type;
             if (param.length >= 1) {
-                record.offset = param[0];
+                property.offset = param[0];
             }
             if (param.length >= 2) {
-                record.align = param[1];
+                property.align = param[1];
             }
             calculateLayout();
             return context as StructDefinedContext<any>;
@@ -734,8 +767,8 @@ export function definedStructure<T extends Record<StructDefinedKey, any> = {}>(n
     };
     const removeProperty: StructDefinedContext<T>["removeProperty"] = (key: StructDefinedKey) => {
         for (let i = context.properties.length - 1; i >= 0; i--) {
-            const record = context.properties[i];
-            if (record.key !== key) {
+            const property = context.properties[i];
+            if (property.key !== key) {
                 continue;
             }
             // Delete
@@ -770,10 +803,17 @@ export function definedStructure<T extends Record<StructDefinedKey, any> = {}>(n
     const toString: StructDefinedContext<T>["toString"] = () => {
         return `struct:${context.name}`;
     };
+    let align: number | null | undefined;
     const context: StructDefinedContext<T> = {
         name: name ?? "unknown",
         size: 0,
-        align: 1,
+        get align() {
+            return align ?? context.maxAlign;
+        },
+        set align(value) {
+            align = value;
+        },
+        maxAlign: 1,
         properties: [],
         getter,
         setter,
