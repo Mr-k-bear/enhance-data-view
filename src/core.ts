@@ -139,6 +139,8 @@ export interface StructDefinitionProperty<T> {
 
 export interface StructDefinitionContext<T extends Record<StructDefinitionKey, any>> extends TypeDefinition<T> {
     maxAlign: number;
+    keys: Array<StructDefinitionKey>;
+    properties: Map<StructDefinitionKey, StructDefinitionProperty<any>>;
     propertyList: Array<StructDefinitionProperty<any>>;
     setName(name: string): StructDefinitionContext<T>;
     setAlign(align?: number): StructDefinitionContext<T>;
@@ -337,7 +339,7 @@ export function defineStruct<T extends Record<StructDefinitionKey, any> = {}>(na
                 return void 0;
             }
             const propertyContext = createPropertyContext(property);
-            const propertyGetter = property.type.getter;
+            const propertyGetter = property.type.reactive ?? property.type.getter;
             getter = () => propertyGetter(propertyContext);
             getterMap.set(key, getter);
             return getter();
