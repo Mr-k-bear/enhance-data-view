@@ -1,840 +1,415 @@
 // Copyright (c) 2024 - 2025 MrKBear
 
-export interface TypeOperationErrorOptions extends ErrorOptions {
-    /** Type descriptor involved in the operation */
-    type?: TypeDefined<any>;
-    /** Data view being accessed during the operation */
-    view?: DataView;
-    /** Buffer offset where the operation occurred */
-    offset?: number;
-    /** Endianness used during the operation */
+export interface OperationContext {
+    view: DataView;
+    offset: number;
     littleEndian?: boolean;
-    /** Indicates if the operation was a read attempt */
-    read?: boolean;
-    /** Indicates if the operation was a write attempt */
-    write?: boolean;
-    /** Write value */
-    writeValue?: any;
-    /** The error occurred during the definition period */
-    defined?: boolean;
 }
 
-/**
- * Error thrown during type descriptor operations
- * 
- * @remarks
- * Represents failures that occur during binary data read/write operations
- * using type descriptors. Contains contextual information about the failed operation.
- */
-export class TypeOperationError extends Error {
-    /** Type descriptor involved in the failed operation */
-    type?: TypeDefined<any>;
-    /** Data view being accessed during the failure */
-    view?: DataView;
-    /** Buffer offset at failure point */
-    offset?: number;
-    /** Endianness used during the operation */
-    littleEndian?: boolean;
-    /** Whether the failed operation was a read attempt */
-    read?: boolean;
-    /** Whether the failed operation was a write attempt */
-    write?: boolean;
-    /** Write value */
-    writeValue?: any;
-    /** The error occurred during the definition period */
-    defined?: boolean;
-
-    /**
-     * Creates a TypeOperationError instance
-     * 
-     * @param message - Human-readable error description
-     * @param options - Contextual information about the failed operation
-     */
-    public constructor(message?: string, options?: TypeOperationErrorOptions) {
-        super(message, options);
-        this.type = options?.type;
-        this.view = options?.view;
-        this.offset = options?.offset;
-        this.littleEndian = options?.littleEndian;
-        this.read = options?.read;
-        this.write = options?.write;
-        this.writeValue = options?.writeValue;
-        this.defined = options?.defined
-    }
+export interface OperationReactiveContext extends OperationContext {
+    getBaseOffset: () => number;
+    localOffset: number;
+    state?: any;
 }
 
-/**
- * Value reader function within type descriptor objects.
- * 
- * @typeParam T - The type described by this descriptor
- * @param view - The data view being operated on
- * @param offset - Read offset position
- * @param littleEndian - Whether to use little-endian byte order
- * @param size - Callback to write actual data size to output. Only required for dynamic-sized types
- * @returns Result value
- */
-export type TypeDefinedGetter<T> = (view: DataView, offset: number, littleEndian: boolean | undefined, size: (size: number) => void) => T;
+export type OperationGetter<T> = (context: OperationContext) => T;
 
-/**
- * Value writer function within type descriptor objects.
- * 
- * @typeParam T - The type described by this descriptor
- * @param view - The data view being operated on
- * @param offset - Write offset position
- * @param littleEndian - Whether to use little-endian byte order
- * @param value - The value to write
- * @returns Actual number of bytes written. Only required for dynamic-sized types.
- */
-export type TypeDefinedSetter<T> = (view: DataView, offset: number, value: T, littleEndian: boolean | undefined) => number | undefined | null | void;
+export type OperationSetter<T> = (context: OperationContext, value: T) => void;
 
-/**
- * Type descriptor object.
- * 
- * @typeParam T - The type described by this descriptor
- */
-export interface TypeDefined<T> extends Object {
-    /**
-     * Type name (used for diagnostic output).
-     */
+export type OperationReactive<T> = (context: OperationReactiveContext) => T;
+
+export interface TypeDefinition<T> extends Object {
     name: string;
-    /**
-     * Type size in bytes (default: undefined).
-     * 
-     * - A positive number indicates the fixed byte size in buffers
-     * - For types with runtime-determined sizes (e.g. C-style strings),
-     *   use `null` or `undefined` to indicate dynamic sizing
-     */
-    size?: number | null | undefined;
-    /**
-     * Memory alignment requirement when used as a struct field
-     * 
-     * @remarks
-     * - When unset (`undefined` or `null`):
-     *   - For fixed-size types: Uses the type's `size` as alignment value
-     *   - For dynamic-size types: Defaults to 1 (no alignment)
-     * - When set: Overrides both default behaviors
-     * 
-     * @note Alignment values should be powers of 2 (1, 2, 4, 8...).
-     * Non-power-of-2 values may cause undefined behavior.
-     */
-    align?: number | null | undefined;
-    /**
-     * Forces little-endian byte order for this type's operations.
-     * 
-     * - When `true`: Always uses little-endian
-     * - When `false`: Always uses big-endian
-     * - When `null` or `undefined`: Inherits endianness from the current operation context
-     */
-    littleEndian?: boolean | null | undefined;
-    /**
-     * Value reader function
-     */
-    getter: TypeDefinedGetter<T>;
-    /**
-     * Value writer function
-     */
-    setter: TypeDefinedSetter<T>;
+    size: number;
+    align?: number;
+    littleEndian?: boolean;
+    getter: OperationGetter<T>;
+    setter: OperationSetter<T>;
+    reactive?: OperationReactive<T>;
 }
 
-/**
- * Extracts the described type from a type descriptor.
- * 
- * @typeParam T - Type of descriptor
- */
-export type TypeDefinedInfer<T extends TypeDefined<any>> = T extends TypeDefined<infer W> ? W : unknown;
-
-/**
- * Type descriptor context (builder interface).
- */
-export interface TypeDefinedContext<T> extends TypeDefined<T> {
-    /**
-     * Sets the type name.
-     * 
-     * @param name - New diagnostic name for the type
-     * @returns This context
-     */
-    setName(name: string): TypeDefinedContext<T>;
-    /** Alias for {@link setName} */
-    n: TypeDefinedContext<T>["setName"];
-    /**
-     * Sets the type size.
-     * 
-     * @param size - Fixed byte size or dynamic for runtime-determined sizes
-     * @returns This context
-     */
-    setSize(size?: number | null | undefined): TypeDefinedContext<T>;
-    /** Alias for {@link setSize} */
-    s: TypeDefinedContext<T>["setSize"];
-    /**
-     * Sets the default byte alignment for struct fields.
-     * {@link TypeDefined.align}
-     * 
-     * @param align - Alignment value (must be power of 2)
-     * @returns This context
-     */
-    setAlign(align?: number | null | undefined): TypeDefinedContext<T>;
-    /** Alias for {@link setAlign} */
-    a: TypeDefinedContext<T>["setAlign"];
-    /**
-     * Sets little-endian byte order.
-     * 
-     * @param littleEndian - {@link TypeDefined.littleEndian}
-     * @returns This context
-     */
-    setLittleEndian(littleEndian?: boolean | null | undefined): TypeDefinedContext<T>;
-    /** Alias for {@link setLittleEndian} */
-    l: TypeDefinedContext<T>["setLittleEndian"];
-    /**
-     * Sets the value reader function.
-     * 
-     * @param getter - Function to read values of this type
-     * @returns This context
-     */
-    setGetter(getter: TypeDefinedGetter<T>): TypeDefinedContext<T>;
-    /** Alias for {@link setGetter} */
-    g: TypeDefinedContext<T>["setGetter"];
-    /**
-     * Sets the value writer function.
-     * 
-     * @param setter - Function to write values of this type
-     * @returns This context
-     */
-    setSetter(setter: TypeDefinedSetter<T>): TypeDefinedContext<T>;
-    /** Alias for {@link setSetter} */
-    w: TypeDefinedContext<T>["setSetter"];
-    /**
-     * Clones this descriptor, returning a new instance.
-     * 
-     * @param name - New diagnostic name for the cloned type
-     * @returns New context instance
-     */
-    clone(name?: string): TypeDefinedContext<T>;
-    /** Alias for {@link clone} */
-    c: TypeDefinedContext<T>["clone"];
+export interface TypeDefinitionContext<T> extends TypeDefinition<T> {
+    setName(name?: string): TypeDefinitionContext<T>;
+    setSize(size?: number): TypeDefinitionContext<T>;
+    setAlign(align?: number): TypeDefinitionContext<T>;
+    setLittleEndian(littleEndian?: boolean): TypeDefinitionContext<T>;
+    setGetter(getter?: OperationGetter<T>): TypeDefinitionContext<T>;
+    setSetter(setter?: OperationSetter<T>): TypeDefinitionContext<T>;
+    setReactive(reactive?: OperationReactive<T>): TypeDefinitionContext<T>;
+    freeze(): TypeDefinitionContext<T>;
+    clone(name?: string): TypeDefinitionContext<T>;
 }
 
-/**
- * Creates a new type descriptor builder context.
- * 
- * @param name - Diagnostic name for the type (used in error messages)
- * @typeParam T - Type of values this descriptor will handle
- * @returns Builder context for configuring the type descriptor
- * 
- * @example
- * ```typescript
- * // Define a 32-bit integer type
- * const int_32 = definedType<number>("int_32")
- *   .setSize(4)
- *   .setGetter((view, offset, le) => view.getInt32(offset, le))
- *   .setSetter((view, offset, le, value) => view.setInt32(offset, value, le));
- * });
- * ```
- * 
- * @example
- * ```typescript
- * // Define a dynamic string type (C-style)
- * const c_string = definedType<string>("c_string")
- *   .setGetter((view, offset, le, setSize) => {
- *     let length = 0;
- *     while (view.getUint8(offset + length) !== 0) length ++;
- *     setSize(length + 1);  // Include null terminator
- *     return Buffer.from(new Uint8Array(view.buffer, offset, length)).toString("utf-8")
- *   });
- * ```
- * 
- * @example
- * ```typescript
- * // Using method aliases for concise configuration
- * const float_64 = definedType<number>("float_64")
- *   .s(8)  // setSize alias
- *   .g((v, o, le) => v.getFloat64(o, le))  // setGetter alias
- *   .w((v, o, le, val) => v.setFloat64(o, val, le))  // setSetter alias
- * ```
- */
-export function definedType<T = unknown>(name?: string): TypeDefinedContext<T> {
-    const getter: TypeDefinedGetter<T> = (view, offset, littleEndian) => {
-        throw new TypeOperationError(`[${context}]: Reader function is unset.`, {
-            type: context,
-            view,
-            offset,
-            littleEndian,
-            read: true
-        });
+export function defineType<T = any>(name?: string): TypeDefinitionContext<T> {
+    let isFreeze = false;
+    const testFreeze = (): void => {
+        if (isFreeze) {
+            throw new Error();
+        }
+    }
+    const setName: TypeDefinitionContext<T>["setName"] = (name) => {
+        testFreeze();
+        typeDefinition.name = name ?? "unknown";
+        return typeDefinition;
     };
-    const setter: TypeDefinedSetter<T> = (view, offset, value, littleEndian) => {
-        throw new TypeOperationError(`[${context}]: Writer function is unset.`, {
-            type: context,
-            view,
-            offset,
-            littleEndian,
-            write: true,
-            writeValue: value
-        });
+    const setSize: TypeDefinitionContext<T>["setSize"] = (size) => {
+        testFreeze();
+        typeDefinition.size = size ?? 0;
+        return typeDefinition;
     };
-    const setName: TypeDefinedContext<T>["setName"] = (name) => {
-        context.name = name || context.name;
-        return context;
+    const setAlign: TypeDefinitionContext<T>["setAlign"] = (align) => {
+        testFreeze();
+        typeDefinition.align = align;
+        return typeDefinition;
     };
-    const setSize: TypeDefinedContext<T>["setSize"] = (size) => {
-        context.size = size;
-        return context;
+    const setLittleEndian: TypeDefinitionContext<T>["setLittleEndian"] = (littleEndian) => {
+        testFreeze();
+        typeDefinition.littleEndian = littleEndian;
+        return typeDefinition;
     };
-    const setAlign: TypeDefinedContext<T>["setAlign"] = (align) => {
-        context.align = align;
-        return context;
+    const setGetter: TypeDefinitionContext<T>["setGetter"] = (newGetter) => {
+        testFreeze();
+        typeDefinition.getter = newGetter ?? getter;
+        return typeDefinition;
     };
-    const setLittleEndian: TypeDefinedContext<T>["setLittleEndian"] = (littleEndian) => {
-        context.littleEndian = littleEndian;
-        return context;
+    const setSetter: TypeDefinitionContext<T>["setSetter"] = (newSetter) => {
+        testFreeze();
+        typeDefinition.setter = newSetter ?? setter;
+        return typeDefinition;
     };
-    const setGetter: TypeDefinedContext<T>["setGetter"] = (getter) => {
-        context.getter = getter;
-        return context;
+    const setReactive: TypeDefinitionContext<T>["setReactive"] = (reactive) => {
+        testFreeze();
+        typeDefinition.reactive = reactive;
+        return typeDefinition;
     };
-    const setSetter: TypeDefinedContext<T>["setSetter"] = (setter) => {
-        context.setter = setter;
-        return context;
+    const freeze: TypeDefinitionContext<T>["freeze"] = () => {
+        isFreeze = true;
+        Object.freeze(typeDefinition);
+        return typeDefinition;
     };
-    const clone: TypeDefinedContext<T>["clone"] = (name) => {
-        const newInstance = definedType<T>(name ?? context.name);
-        newInstance.size = context.size;
-        newInstance.littleEndian = context.littleEndian;
-        newInstance.getter = context.getter;
-        newInstance.setter = context.setter;
+    const clone: TypeDefinitionContext<T>["clone"] = (name) => {
+        const newInstance = defineType<T>(name ?? typeDefinition.name);
+        newInstance.size = typeDefinition.size;
+        newInstance.align = typeDefinition.align;
+        newInstance.littleEndian = typeDefinition.littleEndian;
+        newInstance.getter = typeDefinition.getter;
+        newInstance.setter = typeDefinition.setter;
+        newInstance.reactive = typeDefinition.reactive;
         return newInstance;
     };
-    const toString: TypeDefinedContext<T>["toString"] = () => {
-        return `type:${context.name}`;
+    const toString: TypeDefinitionContext<T>["toString"] = () => {
+        return `type:${typeDefinition.name}`;
     };
-    const context: TypeDefinedContext<T> = {
+    const getter: OperationGetter<T> = () => {
+        throw new Error();
+    };
+    const setter: OperationSetter<T> = () => {
+        throw new Error();
+    };
+    const typeDefinition: TypeDefinitionContext<T> = {
         name: name ?? "unknown",
+        size: 0,
         getter,
         setter,
         setName,
-        n: setName,
         setSize,
-        s: setSize,
         setAlign,
-        a: setAlign,
         setLittleEndian,
-        l: setLittleEndian,
         setGetter,
-        g: setGetter,
         setSetter,
-        w: setSetter,
+        setReactive,
+        freeze,
         clone,
-        c: clone,
         toString
     };
-    return context;
+    return typeDefinition;
 }
 
-/**
- * Type utility to force TypeScript to simplify/compute type representations.
- * 
- * @typeParam T - The type to flatten/simplify
- * 
- * @remarks
- * This is a type-level utility with no runtime behavior. \
- * It triggers TypeScript's type simplification mechanism.
- */
 type Flatten<T> = {} & { [K in keyof T]: T[K] };
 
-/**
- * Valid key types for struct descriptor objects.
- * 
- * @remarks
- * Represents the allowed key types when defining struct field mappings.
- */
-export type StructDefinedKey = string | number | symbol;
+export type StructDefinitionKey = string | symbol;
 
-/**
- * Descriptor for a single property within a struct type
- * 
- * @typeParam T - Type of the property value
- */
-export interface StructDefinedProperty<T> {
-    /**
-     * Property key (field name)
-     */
-    key: StructDefinedKey;
-    /**
-     * Type descriptor for this property
-     */
-    type: TypeDefined<T>;
-    /**
-     * Memory alignment requirement for this property
-     * 
-     * @remarks
-     * - When unset (`undefined` or `null`), inherits the type's alignment
-     * - When set, overrides the type's alignment for this property
-     * - Affects offset calculation by aligning the property's starting address
-     */
-    align?: number | undefined | null;
-    /**
-     * Absolute byte offset from struct's base address
-     * 
-     * @remarks
-     * - When unset (`undefined` or `null`), offset is automatically calculated
-     * - Manual setting bypasses automatic layout computation
-     */
-    offset?: number | undefined | null;
-    /**
-     * @internal
-     */
-    offsetCache?: number | undefined | null;
-    /**
-     * Marks this property as padding space
-     * 
-     * @remarks
-     * Padding properties:
-     * - Are read/written during struct operations
-     * - Are excluded from serialization/deserialization results
-     * - Typically used for reserved memory regions or alignment gaps
-     */
-    padding?: boolean | undefined | null;
+export interface StructDefinitionProperty<T> {
+    key: StructDefinitionKey;
+    type: TypeDefinition<T>;
+    offset: number;
+    staticOffset?: number;
+    padding?: boolean;
 }
 
-/**
- * Builder context for defining struct type descriptors
- * 
- * @typeParam T - Current shape of the struct as a mapped type
- */
-export interface StructDefinedContext<T extends Record<StructDefinedKey, any>> extends TypeDefined<T> {
-    /**
-     * Maximum alignment requirement among all struct fields
-     * 
-     * @internal
-     * 
-     * @remarks
-     * - Automatically computed from all fields' effective alignments
-     * - For empty structs, defaults to 1 (no alignment)
-     * - Updated automatically when fields are added, modified or removed
-     * 
-     * @note This value determines:
-     * 1. The struct's overall alignment when used in other structs
-     * 2. The padding needed after the last field
-     * 3. The struct's size when used in arrays
-     */
+export interface StructDefinitionContext<T extends Record<StructDefinitionKey, any>> extends TypeDefinition<T> {
     maxAlign: number;
-    /**
-     * Ordered list of struct field descriptors
-     * 
-     * @remarks
-     * The order determines the memory layout of the struct.
-     * Contains both regular fields and padding fields.
-     */
-    properties: StructDefinedProperty<any>[];
-    /**
-     * Sets the struct's diagnostic name
-     * 
-     * @param name - Name used in error messages and debugging
-     * @returns This context
-     */
-    setName(name: string): StructDefinedContext<T>;
-    /** Alias for {@link setName} */
-    n: StructDefinedContext<T>["setName"];
-    /**
-     * Sets the default byte alignment for struct fields.
-     * {@link TypeDefined.align}
-     * 
-     * @param align - Alignment value (must be power of 2)
-     * @returns This context
-     */
-    setAlign(align?: number | null | undefined): StructDefinedContext<T>;
-    /** Alias for {@link setAlign} */
-    a: StructDefinedContext<T>["setAlign"];
-    /**
-     * Sets little-endian byte order.
-     * 
-     * @param littleEndian - {@link TypeDefined.littleEndian}
-     * @returns This context
-     */
-    setLittleEndian(littleEndian?: boolean | undefined | null): StructDefinedContext<T>;
-    /** Alias for {@link setLittleEndian} */
-    l: StructDefinedContext<T>["setLittleEndian"];
-    /**
-     * Adds a new field to the struct
-     * 
-     * @typeParam K - Field key type
-     * @typeParam V - Field value type
-     * @param key - Field name or symbol
-     * @param type - Type descriptor for the field
-     * @param offset - Optional new offset position (overrides auto-calculation)
-     * @param align - Optional new alignment requirement
-     * @returns This context
-     * 
-     * @example
-     * ```typescript
-     * // Add a 32-bit integer field named 'id'
-     * structContext.addProperty("id", int_32);
-     * ```
-     * 
-     * @example
-     * ```typescript
-     * // Add field with custom alignment, offset
-     * structContext.addProperty("foo", some_type, 0xFF);
-     * structContext.addProperty("bar", some_type, void 0, 8);
-     * ```
-     */
-    addProperty<K extends StructDefinedKey, V>(key: K extends keyof T ? never : K, type: TypeDefined<V>, offset?: number, align?: number): StructDefinedContext<Flatten<T & { [X in K]: V }>>;
-    /** Alias for {@link addProperty} */
-    p: StructDefinedContext<T>["addProperty"];
-    /**
-     * Adds padding space to the struct layout
-     * 
-     * @param type - Type descriptor determining padding size
-     * @param offset - Optional new offset position (overrides auto-calculation)
-     * @param align - Optional new alignment requirement
-     * @returns This context
-     */
-    addPadding(type: TypeDefined<void> | TypeDefined<undefined>, offset?: number, align?: number): StructDefinedContext<T>;
-    /** Alias for {@link addPadding} */
-    o: StructDefinedContext<T>["addPadding"];
-    /**
-     * Updates an existing struct field's definition
-     * 
-     * @typeParam K - Key of the field to update
-     * @typeParam V - New value type for the field
-     * @param key - Name of the field to modify
-     * @param type - New type descriptor for the field
-     * @param offset - Optional new offset position (overrides auto-calculation)
-     * @param align - Optional new alignment requirement
-     * @returns This context
-     * 
-     * @remarks
-     * This method:
-     * 1. Replaces the field's type descriptor while maintaining its position
-     * 2. After the update, the structure layout will be recalculated
-     */
-    updateProperty<K extends keyof T, V>(key: K, type: TypeDefined<V>, offset?: number, align?: number): StructDefinedContext<Flatten<Omit<T, K> & { [P in K]: V }>>;
-    /** Alias for {@link updateProperty} */
-    u: StructDefinedContext<T>["updateProperty"];
-    /**
-     * Removes a field from the struct definition
-     * 
-     * @typeParam K - Key of the field to remove
-     * @param key - Name of the field to remove
-     * @returns This context
-     * 
-     * @remarks
-     * This method:
-     * 1. Removes the field from the struct layout
-     * 2. After the remove, the structure layout will be recalculated
-     */
-    removeProperty<K extends keyof T>(key: K): StructDefinedContext<Flatten<Omit<T, K>>>;
-    /** Alias for {@link removeProperty} */
-    r: StructDefinedContext<T>["removeProperty"];
-    /**
-     * Clones this descriptor, returning a new instance.
-     * 
-     * @param name - New diagnostic name for the cloned type
-     * @returns New context instance
-     */
-    clone(name?: string): StructDefinedContext<T>;
-    /** Alias for {@link clone} */
-    c: StructDefinedContext<T>["clone"];
+    propertyList: Array<StructDefinitionProperty<any>>;
+    setName(name: string): StructDefinitionContext<T>;
+    setAlign(align?: number): StructDefinitionContext<T>;
+    setLittleEndian(littleEndian?: boolean): StructDefinitionContext<T>;
+    addProperty<K extends StructDefinitionKey, V>(key: K extends keyof T ? never : K, type: TypeDefinition<V>, offset?: number): StructDefinitionContext<Flatten<T & { [X in K]: V }>>;
+    addPadding(type: TypeDefinition<any>, offset?: number): StructDefinitionContext<T>;
+    updateProperty<K extends keyof T, V>(key: K, type: TypeDefinition<V>, offset?: number): StructDefinitionContext<Flatten<Omit<T, K> & { [P in K]: V }>>;
+    removeProperty<K extends keyof T>(key: K): StructDefinitionContext<Flatten<Omit<T, K>>>;
+    freeze(): StructDefinitionContext<T>;
+    clone(name?: string): StructDefinitionContext<T>;
 }
 
-/**
- * Creates a builder context for defining struct types
- * 
- * @param name - Optional diagnostic name for the struct (used in error messages)
- * @typeParam T - Initial struct shape (defaults to empty object `{}`)
- * @returns Builder context for configuring the struct descriptor
- * 
- * @remarks
- * This function initiates a fluent API for:
- * - Defining field layouts with memory alignment
- * - Adding padding regions
- * - Configuring endianness
- * - Building complex binary structures
- * 
- * @example
- * ```typescript
- * // Define an empty struct with diagnostic name
- * const empty_struct = definedStruct("my_struct");
- * ```
- * 
- * @example
- * ```typescript
- * // Define a person struct with multiple fields
- * const person = definedStruct("person")
- *   .addProperty("id", int_32)
- *   .addProperty("name", c_string)
- *   .setAlign(4); // 4-byte alignment
- * ```
- */
-export function definedStruct<T extends Record<StructDefinedKey, any> = {}>(name?: string): StructDefinedContext<T> {
-    const calculateOffset = (property: StructDefinedProperty<any>, offset: number, cached: boolean): number => {
-        // Absolute offset
-        if (typeof property.offset === "number") {
-            return property.offset;
+export function defineStruct<T extends Record<StructDefinitionKey, any> = {}>(name?: string): StructDefinitionContext<T> {
+    let isFreeze = false;
+    const testFreeze = (): void => {
+        if (isFreeze) {
+            throw new Error();
         }
-        // Cached offset
-        if (typeof property.offsetCache === "number") {
-            return property.offsetCache;
-        }
-        // Padding calculation
-        const align = Math.max(property.align ?? property.type.align ?? property.type.size ?? 1, 1);
-        const padding = (align - (offset % align)) % align;
-        const alignedOffset = offset + padding;
-        // Cached
-        if (cached) {
-            property.offsetCache = alignedOffset;
-        }
-        return alignedOffset;
-    };
-    const getter: TypeDefinedGetter<T> = (view, offset, littleEndian, size) => {
-        const structure: Record<StructDefinedKey, any> = {};
-        let staticSize = true;
-        let currentOffset = 0;
-        let currentSize: number | undefined;
-        const sizeCallback = (size: number) => {
-            currentSize = size;
-        }
-        for (const property of context.properties) {
-            currentSize = void 0;
-            currentOffset = calculateOffset(property, currentOffset, staticSize);
-            const of = offset + currentOffset;
-            const le = littleEndian ?? (typeof property.type.littleEndian === "boolean" ? property.type.littleEndian : void 0);
-            const value = property.type.getter(view, of, le, sizeCallback);
-            // Padding
-            if (!property.padding) {
-                structure[property.key] = value;
-            }
-            // Static size
-            if (typeof property.type.size === "number") {
-                currentOffset += property.type.size;
-                continue;
-            }
-            // Dynamic size
-            staticSize = false;
-            if (typeof currentSize === "number") {
-                currentOffset += currentSize;
-                continue;
-            }
-            const keyString = typeof property.key === "symbol" ? `Symbol(${property.key.description || ""})` : property.key;
-            throw new TypeOperationError(`[${context} => ${keyString}]: The dynamic-sized types must return its actual size.`, {
-                type: context,
-                view,
-                offset: of,
-                littleEndian: le,
-                read: true
-            });
-        }
-        // Output
-        size(currentOffset);
-        return structure;
-    };
-    const setter: TypeDefinedSetter<T> = (view, offset, value, littleEndian) => {
-        let staticSize = true;
-        let currentOffset = 0;
-        for (const property of context.properties) {
-            currentOffset = calculateOffset(property, currentOffset, staticSize);
-            const of = offset + currentOffset;
-            const le = littleEndian ?? (typeof property.type.littleEndian === "boolean" ? property.type.littleEndian : void 0);
-            // Padding
-            let val: any = void 0;
-            if (!property.padding) {
-                val = value[property.key];
-            }
-            const currentSize = property.type.setter(view, of, val, le);
-            // Static size
-            if (typeof property.type.size === "number") {
-                currentOffset += property.type.size;
-                continue;
-            }
-            // Dynamic size
-            staticSize = false;
-            if (typeof currentSize === "number") {
-                currentOffset += currentSize;
-                continue;
-            }
-            const keyString = typeof property.key === "symbol" ? `Symbol(${property.key.description || ""})` : property.key;
-            throw new TypeOperationError(`[${context} => ${keyString}]: The dynamic-sized types must return its actual size.`, {
-                type: property.type,
-                view,
-                offset: of,
-                littleEndian: le,
-                write: true,
-                writeValue: val
-            });
-        }
-        return currentOffset;
-    };
+    }
     const calculateLayout = () => {
         let maxAlign: number = 1;
-        let currentOffset: number | undefined = 0;
-        for (const property of context.properties) {
-            // Clear cache
-            property.offsetCache = void 0;
-            // Update max align
-            const align = Math.max(property.align ?? property.type.align ?? property.type.size ?? 1, 1);
-            maxAlign = Math.max(maxAlign, align);
-            // Cache offset
-            if (typeof currentOffset !== "number") {
+        let offset: number = 0;
+        for (const property of typeDefinition.propertyList) {
+            if (typeof property.staticOffset === "number") {
+                offset = property.staticOffset;
+                property.offset = offset;
                 continue;
             }
-            currentOffset = calculateOffset(property, currentOffset, true);
-            // Static size
-            if (typeof property.type.size === "number") {
-                currentOffset += property.type.size;
-            }
-            // Dynamic size
-            else {
-                currentOffset = void 0;
-            }
+            // Update max align
+            const align = Math.max(property.type.align ?? property.type.size, 1);
+            maxAlign = Math.max(maxAlign, align);
+            // Padding calculation
+            const padding = (align - (offset % align)) % align;
+            // Update offset
+            offset += padding + property.type.size
+            property.offset = offset;
         }
         // End padding
-        if (typeof currentOffset === "number") {
-            const endPadding = (maxAlign - (currentOffset % maxAlign)) % maxAlign;
-            currentOffset += endPadding;
-        }
-        context.maxAlign = maxAlign;
-        context.size = currentOffset;
+        const endPadding = (maxAlign - (offset % maxAlign)) % maxAlign;
+        offset += endPadding;
+        // Update
+        typeDefinition.maxAlign = maxAlign;
+        typeDefinition.size = offset;
     };
-    const setName: StructDefinedContext<T>["setName"] = (name) => {
-        context.name = name || context.name;
-        return context;
+    const setName: StructDefinitionContext<T>["setName"] = (name) => {
+        testFreeze();
+        typeDefinition.name = name ?? "unknown";
+        return typeDefinition;
     };
-    const setAlign: StructDefinedContext<T>["setAlign"] = (align) => {
-        context.align = align;
-        return context;
+    const setAlign: StructDefinitionContext<T>["setAlign"] = (align) => {
+        testFreeze();
+        typeDefinition.align = align;
+        return typeDefinition;
     };
-    const setLittleEndian: StructDefinedContext<T>["setLittleEndian"] = (littleEndian) => {
-        context.littleEndian = littleEndian;
-        return context;
+    const setLittleEndian: StructDefinitionContext<T>["setLittleEndian"] = (littleEndian) => {
+        testFreeze();
+        typeDefinition.littleEndian = littleEndian;
+        return typeDefinition;
     };
-    const pushProperty = (property: StructDefinedProperty<any>): StructDefinedContext<T> => {
+    const pushProperty = (property: StructDefinitionProperty<any>): StructDefinitionContext<T> => {
+        testFreeze();
         // Duplicate Check
-        for (const prop of context.properties) {
+        for (const prop of typeDefinition.propertyList) {
             if (prop.key !== property.key) {
                 continue;
             }
             const keyString = typeof prop.key === "symbol" ? `Symbol(${prop.key.description || ""})` : prop.key;
-            throw new TypeOperationError(
-                `[${context}] Cannot add property "${keyString}" repeatedly. ` +
-                `If you want to modify existing property, please use the "updateProperty()" function`,
-                {
-                    type: context,
-                    defined: true
-                }
-            );
+            throw new Error();
         }
-        context.properties.push(property);
+        typeDefinition.propertyList.push(property);
         calculateLayout();
-        return context;
+        return typeDefinition;
     };
-    const addProperty: StructDefinedContext<T>["addProperty"] = (key, type, offset, align) => pushProperty({
+    const addProperty: StructDefinitionContext<T>["addProperty"] = (key, type, staticOffset) => pushProperty({
         key: key,
         type: type,
-        align: align,
-        offset: offset
+        offset: 0,
+        staticOffset
     });
-    const addPadding: StructDefinedContext<T>["addPadding"] = (type, offset, align) => pushProperty({
+    const addPadding: StructDefinitionContext<T>["addPadding"] = (type, staticOffset) => pushProperty({
         key: Symbol("padding"),
         type: type,
-        align: align,
-        offset: offset,
+        offset: 0,
+        staticOffset,
         padding: true
     });
-    const updateProperty: StructDefinedContext<T>["updateProperty"] = (key: StructDefinedKey, type, ...param) => {
-        for (const property of context.properties) {
+    const updateProperty: StructDefinitionContext<T>["updateProperty"] = (key, type, staticOffset) => {
+        testFreeze();
+        for (const property of typeDefinition.propertyList) {
             if (property.key !== key) {
                 continue;
             }
             // Update
             property.type = type;
-            if (param.length >= 1) {
-                property.offset = param[0];
-            }
-            if (param.length >= 2) {
-                property.align = param[1];
-            }
+            property.staticOffset = staticOffset;
             calculateLayout();
-            return context as StructDefinedContext<any>;
+            return typeDefinition as StructDefinitionContext<any>;
         }
         const keyString = typeof key === "symbol" ? `Symbol(${key.description || ""})` : key;
-        throw new TypeOperationError(
-            `[${context}] Cannot update non-existent property "${keyString}". ` +
-            `If you want to add a new property, please use the "addProperty()" function`,
-            {
-                type: context,
-                defined: true
-            }
-        );
+        throw new Error();
     };
-    const removeProperty: StructDefinedContext<T>["removeProperty"] = (key: StructDefinedKey) => {
-        for (let i = context.properties.length - 1; i >= 0; i--) {
-            const property = context.properties[i];
+    const removeProperty: StructDefinitionContext<T>["removeProperty"] = (key) => {
+        testFreeze();
+        for (let i = typeDefinition.propertyList.length - 1; i >= 0; i--) {
+            const property = typeDefinition.propertyList[i];
             if (property.key !== key) {
                 continue;
             }
             // Delete
-            context.properties.splice(i, 1);
+            typeDefinition.propertyList.splice(i, 1);
             calculateLayout();
-            return context as StructDefinedContext<any>;
+            return typeDefinition as StructDefinitionContext<any>;
         }
         const keyString = typeof key === "symbol" ? `Symbol(${key.description || ""})` : key;
-        throw new TypeOperationError(
-            `[${context}] Cannot remove non-existent property "${keyString}". ` +
-            {
-                type: context,
-                defined: true
-            }
-        );
-    }
-    const clone: StructDefinedContext<T>["clone"] = (name) => {
-        const newInstance = definedStruct<T>(name ?? context.name);
-        newInstance.size = context.size;
-        newInstance.align = context.align;
-        newInstance.littleEndian = context.littleEndian;
-        newInstance.maxAlign = context.maxAlign;
-        newInstance.properties = context.properties.map(p => ({
-            key: p.key,
-            type: p.type,
-            align: p.align,
-            offset: p.offset,
-            offsetCache: p.offsetCache,
-            padding: p.padding
-        }));
+        throw new Error();
+    };
+    const freeze: StructDefinitionContext<T>["freeze"] = () => {
+        isFreeze = true;
+        Object.freeze(typeDefinition.propertyList);
+        Object.freeze(typeDefinition);
+        return typeDefinition;
+    };
+    const clone: StructDefinitionContext<T>["clone"] = (name) => {
+        const newInstance = defineStruct<T>(name ?? typeDefinition.name);
+        newInstance.size = typeDefinition.size;
+        newInstance.align = typeDefinition.align;
+        newInstance.littleEndian = typeDefinition.littleEndian;
+        newInstance.maxAlign = typeDefinition.maxAlign;
+        for (const property of typeDefinition.propertyList) {
+            newInstance.propertyList.push({
+                key: property.key,
+                type: property.type,
+                offset: property.offset,
+                staticOffset: property.staticOffset,
+                padding: property.padding
+            });
+        }
         return newInstance;
     };
-    const toString: StructDefinedContext<T>["toString"] = () => {
-        return `struct:${context.name}`;
+    const toString: StructDefinitionContext<T>["toString"] = () => {
+        return `struct:${typeDefinition.name}`;
     };
-    let align: number | null | undefined;
-    const context: StructDefinedContext<T> = {
+    const getter: OperationGetter<T> = (context) => {
+        const structure: Record<StructDefinitionKey, any> = {};
+        for (const property of typeDefinition.propertyList) {
+            if (property.padding) {
+                continue;
+            }
+            structure[property.key] = property.type.getter({
+                view: context.view,
+                offset: context.offset + property.offset,
+                littleEndian: context.littleEndian ?? property.type.littleEndian,
+            });
+        }
+        return structure as T;
+    };
+    const setter: OperationSetter<T> = (context, value) => {
+        for (const property of typeDefinition.propertyList) {
+            if (property.padding) {
+                continue;
+            }
+            property.type.setter({
+                view: context.view,
+                offset: context.offset + property.offset,
+                littleEndian: context.littleEndian ?? property.type.littleEndian,
+            }, value[property.key]);
+        }
+    };
+    const reactive: OperationReactive<T> = (context) => {
+        let proxy: T | undefined = context.state;
+        if (proxy) {
+            return proxy;
+        }
+        const propertyList = typeDefinition.propertyList;
+        const createPropertyContext = (property: StructDefinitionProperty<any>): OperationReactiveContext => {
+            const localOffset = context.localOffset + property.offset;
+            const propertyContext: OperationReactiveContext = {
+                get offset() {
+                    return context.getBaseOffset() + localOffset;
+                },
+                getBaseOffset: context.getBaseOffset,
+                localOffset,
+                view: context.view,
+                littleEndian: context.littleEndian ?? property.type.littleEndian
+            };
+            return propertyContext;
+        };
+        const getterMap = new Map<StructDefinitionKey, () => any>();
+        const get: ProxyHandler<T>["get"] = (target, key) => {
+            let getter = getterMap.get(key);
+            if (getter) {
+                return getter();
+            }
+            const property = propertyList.find(property => property.key === key);
+            if (!property) {
+                return void 0;
+            }
+            const propertyContext = createPropertyContext(property);
+            const propertyGetter = property.type.getter;
+            getter = () => propertyGetter(propertyContext);
+            getterMap.set(key, getter);
+            return getter();
+        };
+        const setterMap = new Map<StructDefinitionKey, (value: any) => void>();
+        const set: ProxyHandler<T>["set"] = (target, key, value) => {
+            let setter = setterMap.get(key);
+            if (setter) {
+                setter(value);
+                return true;
+            }
+            const property = propertyList.find(property => property.key === key);
+            if (!property) {
+                return false;
+            }
+            const propertyContext = createPropertyContext(property);
+            const propertySetter = property.type.setter;
+            setter = (newValue) => propertySetter(propertyContext, newValue);
+            setterMap.set(key, setter);
+            setter(value);
+            return true;
+        };
+        const keyArray = new Array<StructDefinitionKey>();
+        const keySet = new Set<StructDefinitionKey>();
+        for (const property of propertyList) {
+            if (property.padding) {
+                continue;
+            }
+            keyArray.push(property.key);
+            keySet.add(property.key);
+        }
+        const has: ProxyHandler<T>["has"] = (target, key) => {
+            return keySet.has(key);
+        };
+        const ownKeys: ProxyHandler<T>["ownKeys"] = () => {
+            return keyArray;
+        };
+        proxy = new Proxy({} as T, {
+            get,
+            set,
+            has,
+            ownKeys
+        });
+        context.state = proxy;
+        return proxy;
+    }
+    let align: number | undefined;
+    const typeDefinition: StructDefinitionContext<T> = {
         name: name ?? "unknown",
         size: 0,
         get align() {
-            return align ?? context.maxAlign;
+            return align ?? typeDefinition.maxAlign;
         },
         set align(value) {
+            testFreeze();
             align = value;
         },
-        maxAlign: 1,
-        properties: [],
         getter,
         setter,
+        reactive,
+        maxAlign: 1,
+        propertyList: [],
         setName,
-        n: setName,
-        setLittleEndian,
-        l: setLittleEndian,
         setAlign,
-        a: setAlign,
+        setLittleEndian,
         addProperty,
-        p: addProperty,
         addPadding,
-        o: addPadding,
         updateProperty,
-        u: updateProperty,
         removeProperty,
-        r: removeProperty,
+        freeze,
         clone,
-        c: clone,
         toString
-    };
-    return context;
+    }
+    return typeDefinition;
 }
