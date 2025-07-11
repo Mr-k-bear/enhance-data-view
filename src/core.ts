@@ -18,7 +18,7 @@ export type OperationSetter<T> = (context: OperationContext, value: T) => void;
 
 export type OperationReactive<T> = (context: OperationReactiveContext) => T;
 
-export interface TypeDefinition<T> extends Object {
+export interface TypeDefinition<T> {
     name: string;
     size: number;
     align?: number;
@@ -97,9 +97,6 @@ export function defineType<T = any>(name?: string): TypeDefinitionContext<T> {
         newInstance.reactive = typeDefinition.reactive;
         return newInstance;
     };
-    const toString: TypeDefinitionContext<T>["toString"] = () => {
-        return `type:${typeDefinition.name}`;
-    };
     const getter: OperationGetter<T> = () => {
         throw new Error();
     };
@@ -119,8 +116,7 @@ export function defineType<T = any>(name?: string): TypeDefinitionContext<T> {
         setSetter,
         setReactive,
         freeze,
-        clone,
-        toString
+        clone
     };
     return typeDefinition;
 }
@@ -139,12 +135,13 @@ export interface StructDefinitionProperty<T> {
 
 export interface StructDefinitionContext<T extends Record<StructDefinitionKey, any>> extends TypeDefinition<T> {
     maxAlign: number;
-    keys: Array<StructDefinitionKey>;
-    properties: Map<StructDefinitionKey, StructDefinitionProperty<any>>;
+    keys: ReadonlyArray<StructDefinitionKey>;
+    properties: ReadonlyMap<StructDefinitionKey, StructDefinitionProperty<any>>;
     propertyList: Array<StructDefinitionProperty<any>>;
     setName(name: string): StructDefinitionContext<T>;
     setAlign(align?: number): StructDefinitionContext<T>;
     setLittleEndian(littleEndian?: boolean): StructDefinitionContext<T>;
+    updateLayout(): StructDefinitionContext<T>;
     addProperty<K extends StructDefinitionKey, V>(key: K extends keyof T ? never : K, type: TypeDefinition<V>, offset?: number): StructDefinitionContext<Flatten<T & { [X in K]: V }>>;
     addPadding(type: TypeDefinition<any>, offset?: number): StructDefinitionContext<T>;
     updateProperty<K extends keyof T, V>(key: K, type: TypeDefinition<V>, offset?: number): StructDefinitionContext<Flatten<Omit<T, K> & { [P in K]: V }>>;
@@ -160,10 +157,19 @@ export function defineStruct<T extends Record<StructDefinitionKey, any> = {}>(na
             throw new Error();
         }
     }
-    const calculateLayout = () => {
+    const updateLayout = () => {
+        testFreeze();
+        const { propertyList } = typeDefinition;
+        const keys = new Array<StructDefinitionKey>;
+        const properties = new Map<StructDefinitionKey, StructDefinitionProperty<any>>();
         let maxAlign: number = 1;
         let offset: number = 0;
-        for (const property of typeDefinition.propertyList) {
+        for (const property of propertyList) {
+            if (!property.padding) {
+                keys.push(property.key);
+                properties.set(property.key, property);
+            }
+            // Static offset
             if (typeof property.staticOffset === "number") {
                 offset = property.staticOffset;
                 property.offset = offset;
@@ -184,6 +190,9 @@ export function defineStruct<T extends Record<StructDefinitionKey, any> = {}>(na
         // Update
         typeDefinition.maxAlign = maxAlign;
         typeDefinition.size = offset;
+        typeDefinition.keys = keys;
+        typeDefinition.properties = properties;
+        return typeDefinition;
     };
     const setName: StructDefinitionContext<T>["setName"] = (name) => {
         testFreeze();
@@ -202,17 +211,14 @@ export function defineStruct<T extends Record<StructDefinitionKey, any> = {}>(na
     };
     const pushProperty = (property: StructDefinitionProperty<any>): StructDefinitionContext<T> => {
         testFreeze();
+        const { properties, propertyList } = typeDefinition;
         // Duplicate Check
-        for (const prop of typeDefinition.propertyList) {
-            if (prop.key !== property.key) {
-                continue;
-            }
-            const keyString = typeof prop.key === "symbol" ? `Symbol(${prop.key.description || ""})` : prop.key;
+        if (properties.has(property.key)) {
             throw new Error();
         }
-        typeDefinition.propertyList.push(property);
-        calculateLayout();
-        return typeDefinition;
+        // Update
+        propertyList.push(property);
+        return updateLayout();
     };
     const addProperty: StructDefinitionContext<T>["addProperty"] = (key, type, staticOffset) => pushProperty({
         key: key,
@@ -229,36 +235,34 @@ export function defineStruct<T extends Record<StructDefinitionKey, any> = {}>(na
     });
     const updateProperty: StructDefinitionContext<T>["updateProperty"] = (key, type, staticOffset) => {
         testFreeze();
-        for (const property of typeDefinition.propertyList) {
-            if (property.key !== key) {
-                continue;
-            }
-            // Update
-            property.type = type;
-            property.staticOffset = staticOffset;
-            calculateLayout();
-            return typeDefinition as StructDefinitionContext<any>;
+        const { properties } = typeDefinition;
+        const property = properties.get(key as StructDefinitionKey);
+        if (!property) {
+            throw new Error();
         }
-        const keyString = typeof key === "symbol" ? `Symbol(${key.description || ""})` : key;
-        throw new Error();
+        // Update
+        property.type = type;
+        property.staticOffset = staticOffset;
+        return updateLayout() as StructDefinitionContext<any>;
     };
     const removeProperty: StructDefinitionContext<T>["removeProperty"] = (key) => {
         testFreeze();
-        for (let i = typeDefinition.propertyList.length - 1; i >= 0; i--) {
-            const property = typeDefinition.propertyList[i];
-            if (property.key !== key) {
-                continue;
-            }
-            // Delete
-            typeDefinition.propertyList.splice(i, 1);
-            calculateLayout();
-            return typeDefinition as StructDefinitionContext<any>;
+        const { propertyList } = typeDefinition;
+        const propertyIndex = propertyList.findIndex(property => property.key === key);
+        if (propertyIndex < 0) {
+            throw new Error();
         }
-        const keyString = typeof key === "symbol" ? `Symbol(${key.description || ""})` : key;
-        throw new Error();
+        // Delete
+        propertyList.splice(propertyIndex, 1);
+        return updateLayout() as StructDefinitionContext<any>;
     };
     const freeze: StructDefinitionContext<T>["freeze"] = () => {
         isFreeze = true;
+        for (const property of typeDefinition.propertyList) {
+            Object.freeze(property);
+        }
+        Object.freeze(typeDefinition.keys);
+        Object.freeze(typeDefinition.properties);
         Object.freeze(typeDefinition.propertyList);
         Object.freeze(typeDefinition);
         return typeDefinition;
@@ -278,63 +282,60 @@ export function defineStruct<T extends Record<StructDefinitionKey, any> = {}>(na
                 padding: property.padding
             });
         }
-        return newInstance;
+        return newInstance.updateLayout();
     };
-    const toString: StructDefinitionContext<T>["toString"] = () => {
-        return `struct:${typeDefinition.name}`;
-    };
-    const getter: OperationGetter<T> = (context) => {
+    const getter: OperationGetter<T> = ({ view, offset, littleEndian }) => {
         const structure: Record<StructDefinitionKey, any> = {};
-        for (const property of typeDefinition.propertyList) {
-            if (property.padding) {
-                continue;
-            }
+        for (const [, property] of typeDefinition.properties) {
             structure[property.key] = property.type.getter({
-                view: context.view,
-                offset: context.offset + property.offset,
-                littleEndian: context.littleEndian ?? property.type.littleEndian,
+                view,
+                offset: offset + property.offset,
+                littleEndian: littleEndian ?? property.type.littleEndian,
             });
         }
         return structure as T;
     };
-    const setter: OperationSetter<T> = (context, value) => {
-        for (const property of typeDefinition.propertyList) {
-            if (property.padding) {
-                continue;
-            }
+    const setter: OperationSetter<T> = ({ view, offset, littleEndian }, value) => {
+        for (const [, property] of typeDefinition.properties) {
             property.type.setter({
-                view: context.view,
-                offset: context.offset + property.offset,
-                littleEndian: context.littleEndian ?? property.type.littleEndian,
+                view,
+                offset: offset + property.offset,
+                littleEndian: littleEndian ?? property.type.littleEndian,
             }, value[property.key]);
         }
     };
     const reactive: OperationReactive<T> = (context) => {
-        let proxy: T | undefined = context.state;
-        if (proxy) {
-            return proxy;
+        const { state } = context;
+        // Proxy cached
+        if (state) {
+            return state;
         }
-        const propertyList = typeDefinition.propertyList;
+        // Create proxy
+        const { view, littleEndian, localOffset, getBaseOffset } = context;
+        const { properties, keys } = typeDefinition;
+        // Used to create property type operation context
         const createPropertyContext = (property: StructDefinitionProperty<any>): OperationReactiveContext => {
-            const localOffset = context.localOffset + property.offset;
+            const propertyLocalOffset = localOffset + property.offset;
             const propertyContext: OperationReactiveContext = {
+                view,
+                // Adapt to regular types
                 get offset() {
-                    return context.getBaseOffset() + localOffset;
+                    return getBaseOffset() + propertyLocalOffset;
                 },
-                getBaseOffset: context.getBaseOffset,
-                localOffset,
-                view: context.view,
-                littleEndian: context.littleEndian ?? property.type.littleEndian
+                littleEndian: littleEndian ?? property.type.littleEndian,
+                localOffset: propertyLocalOffset,
+                getBaseOffset
             };
             return propertyContext;
         };
+        // Property getter
         const getterMap = new Map<StructDefinitionKey, () => any>();
         const get: ProxyHandler<T>["get"] = (target, key) => {
             let getter = getterMap.get(key);
             if (getter) {
                 return getter();
             }
-            const property = propertyList.find(property => property.key === key);
+            const property = properties.get(key);
             if (!property) {
                 return void 0;
             }
@@ -344,6 +345,7 @@ export function defineStruct<T extends Record<StructDefinitionKey, any> = {}>(na
             getterMap.set(key, getter);
             return getter();
         };
+        // Property setter
         const setterMap = new Map<StructDefinitionKey, (value: any) => void>();
         const set: ProxyHandler<T>["set"] = (target, key, value) => {
             let setter = setterMap.get(key);
@@ -351,7 +353,7 @@ export function defineStruct<T extends Record<StructDefinitionKey, any> = {}>(na
                 setter(value);
                 return true;
             }
-            const property = propertyList.find(property => property.key === key);
+            const property = properties.get(key);
             if (!property) {
                 return false;
             }
@@ -362,22 +364,13 @@ export function defineStruct<T extends Record<StructDefinitionKey, any> = {}>(na
             setter(value);
             return true;
         };
-        const keyArray = new Array<StructDefinitionKey>();
-        const keySet = new Set<StructDefinitionKey>();
-        for (const property of propertyList) {
-            if (property.padding) {
-                continue;
-            }
-            keyArray.push(property.key);
-            keySet.add(property.key);
-        }
         const has: ProxyHandler<T>["has"] = (target, key) => {
-            return keySet.has(key);
+            return properties.has(key);
         };
         const ownKeys: ProxyHandler<T>["ownKeys"] = () => {
-            return keyArray;
+            return keys;
         };
-        proxy = new Proxy({} as T, {
+        const proxy = new Proxy({} as T, {
             get,
             set,
             has,
@@ -401,17 +394,19 @@ export function defineStruct<T extends Record<StructDefinitionKey, any> = {}>(na
         setter,
         reactive,
         maxAlign: 1,
+        keys: [],
+        properties: new Map(),
         propertyList: [],
         setName,
         setAlign,
         setLittleEndian,
+        updateLayout,
         addProperty,
         addPadding,
         updateProperty,
         removeProperty,
         freeze,
-        clone,
-        toString
+        clone
     }
     return typeDefinition;
 }
