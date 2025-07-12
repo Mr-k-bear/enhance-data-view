@@ -410,3 +410,231 @@ export function defineStruct<T extends Record<StructDefinitionKey, any> = {}>(na
     }
     return typeDefinition;
 }
+
+export interface ArrayDefinitionContext<T = any> extends TypeDefinition<Array<T>> {
+    element: TypeDefinition<T>;
+    length: number;
+    setName(name: string): ArrayDefinitionContext<T>;
+    setAlign(align?: number): ArrayDefinitionContext<T>;
+    setLittleEndian(littleEndian?: boolean): ArrayDefinitionContext<T>;
+    setElement<M>(type: TypeDefinition<M>): ArrayDefinitionContext<M>;
+    setLength(length: number): ArrayDefinitionContext<T>;
+    freeze(): ArrayDefinitionContext<T>;
+    clone(name?: string): ArrayDefinitionContext<T>;
+}
+
+export function defineArray<T>(element: TypeDefinition<T>, length: number, customName?: string): ArrayDefinitionContext<T> {
+    let isFreeze = false;
+    const testFreeze = (): void => {
+        if (isFreeze) {
+            throw new Error();
+        }
+    }
+    const setName: ArrayDefinitionContext<T>["setName"] = (name) => {
+        testFreeze();
+        typeDefinition.name = name ?? "unknown";
+        return typeDefinition;
+    };
+    const setAlign: ArrayDefinitionContext<T>["setAlign"] = (align) => {
+        testFreeze();
+        typeDefinition.align = align;
+        return typeDefinition;
+    };
+    const setLittleEndian: ArrayDefinitionContext<T>["setLittleEndian"] = (littleEndian) => {
+        testFreeze();
+        typeDefinition.littleEndian = littleEndian;
+        return typeDefinition;
+    };
+    const setElement: ArrayDefinitionContext<T>["setElement"] = (element: TypeDefinition<any>) => {
+        testFreeze();
+        typeDefinition.element = element;
+        typeDefinition.size = element.size * typeDefinition.length;
+        return typeDefinition as ArrayDefinitionContext<any>;
+    };
+    const setLength: ArrayDefinitionContext<T>["setLength"] = (length) => {
+        testFreeze();
+        typeDefinition.length = length;
+        typeDefinition.size = typeDefinition.element.size * length;
+        return typeDefinition;
+    };
+    const freeze: ArrayDefinitionContext<T>["freeze"] = () => {
+        isFreeze = true;
+        Object.freeze(typeDefinition);
+        return typeDefinition;
+    };
+    const clone: ArrayDefinitionContext<T>["clone"] = (newName) => {
+        const newInstance = defineArray<T>(typeDefinition.element, typeDefinition.length, newName ?? name);
+        newInstance.size = typeDefinition.size;
+        newInstance.align = typeDefinition.align;
+        newInstance.littleEndian = typeDefinition.littleEndian;
+        return newInstance;
+    };
+    const getter: OperationGetter<Array<T>> = ({ view, offset, littleEndian }) => {
+        const { element, length } = typeDefinition;
+        const array: Array<T> = [];
+        for (let index = 0; index < length; index++) {
+            array.push(element.getter({
+                view,
+                offset: offset + index * element.size,
+                littleEndian: littleEndian ?? element.littleEndian,
+            }));
+        }
+        return array;
+    };
+    const setter: OperationSetter<Array<T>> = ({ view, offset, littleEndian }, value) => {
+        const { element, length } = typeDefinition;
+        for (let index = 0; index < length; index++) {
+            element.setter({
+                view,
+                offset: offset + index * element.size,
+                littleEndian: littleEndian ?? element.littleEndian,
+            }, value[index]);
+        }
+    };
+    const reactive: OperationReactive<Array<T>> = (context) => {
+        const { state } = context;
+        // Proxy cached
+        if (state) {
+            return state;
+        }
+        // Create proxy
+        const { view, littleEndian, localOffset, getBaseOffset } = context;
+        const { element, length } = typeDefinition;
+        // Used to create element type operation context
+        const createContext = (index: number): OperationReactiveContext => {
+            const propertyLocalOffset = localOffset + index * element.size;
+            const propertyContext: OperationReactiveContext = {
+                view,
+                // Adapt to regular types
+                get offset() {
+                    return getBaseOffset() + propertyLocalOffset;
+                },
+                littleEndian: littleEndian ?? element.littleEndian,
+                localOffset: propertyLocalOffset,
+                getBaseOffset
+            };
+            return propertyContext;
+        };
+        // Element getter
+        const getterMap = new Map<number, () => T>();
+        const getElement = (index: number): T => {
+            let getter = getterMap.get(index);
+            if (getter) {
+                return getter();
+            }
+            const elementContext = createContext(index);
+            const elementGetter = element.reactive ?? element.getter;
+            getter = () => elementGetter(elementContext);
+            getterMap.set(index, getter);
+            return getter();
+        }
+        // Symbol.iterator
+        const iterator = function* (): ArrayIterator<T> {
+            for (let index = 0; index < length; index++) {
+                yield getElement(index);
+            }
+        }
+        // Built-in properties
+        const internal = new Map<symbol | string, any>([
+            ["length", length],
+            [Symbol.iterator, iterator]
+        ]);
+        // getter
+        const get: ProxyHandler<Array<T>>["get"] = (target, key) => {
+            if (typeof key === "symbol") {
+                return internal.get(key);
+            }
+            const index = Number(key);
+            if (isNaN(index)) {
+                return internal.get(key);
+            }
+            if (index < 0 || index >= length) {
+                return void 0;
+            }
+            return getElement(index);
+        };
+        // setter
+        const set: ProxyHandler<Array<T>>["set"] = (target, key, value) => {
+            if (typeof key === "symbol") {
+                return false;
+            }
+            const index = Number(key);
+            if (isNaN(index)) {
+                return false;
+            }
+            if (index < 0 || index >= length) {
+                return false;
+            }
+            element.setter({
+                view,
+                offset: getBaseOffset() + localOffset + index * element.size,
+                littleEndian: littleEndian ?? element.littleEndian,
+            }, value[index]);
+            return true;
+        };
+        const has: ProxyHandler<Array<T>>["has"] = (target, key) => {
+            if (typeof key === "symbol") {
+                return false;
+            }
+            const index = Number(key);
+            if (isNaN(index)) {
+                return false;
+            }
+            if (index < 0 || index >= length) {
+                return false;
+            }
+            return true;
+        };
+        let keys: string[] | undefined;
+        const ownKeys: ProxyHandler<Array<T>>["ownKeys"] = () => {
+            if (keys) {
+                return keys;
+            }
+            keys = [];
+            for (let index = 0; index < length; index++) {
+                keys.push(String(index));
+            }
+            return keys;
+        };
+        const proxy = new Proxy([] as Array<T>, {
+            get,
+            set,
+            has,
+            ownKeys
+        });
+        context.state = proxy;
+        return proxy;
+    };
+    let name: string | undefined = customName;
+    let align: number | undefined;
+    const typeDefinition: ArrayDefinitionContext<T> = {
+        get name() {
+            return name ?? `${typeDefinition.element.name}[${typeDefinition.length}]`
+        },
+        set name(value) {
+            testFreeze();
+            name = value;
+        },
+        size: 0,
+        get align() {
+            return align ?? typeDefinition.element.align;
+        },
+        set align(value) {
+            testFreeze();
+            align = value;
+        },
+        getter,
+        setter,
+        reactive,
+        element,
+        length,
+        setName,
+        setAlign,
+        setLittleEndian,
+        setElement,
+        setLength,
+        freeze,
+        clone
+    };
+    return typeDefinition;
+}
