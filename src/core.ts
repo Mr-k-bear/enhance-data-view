@@ -496,18 +496,18 @@ export function defineArray<T>(element: TypeDefinition<T>, length: number, custo
         const { element, length } = typeDefinition;
         // Used to create element type operation context
         const createContext = (index: number): OperationReactiveContext => {
-            const propertyLocalOffset = localOffset + index * element.size;
-            const propertyContext: OperationReactiveContext = {
+            const elementLocalOffset = localOffset + index * element.size;
+            const elementContext: OperationReactiveContext = {
                 view,
                 // Adapt to regular types
                 get offset() {
-                    return getBaseOffset() + propertyLocalOffset;
+                    return getBaseOffset() + elementLocalOffset;
                 },
                 littleEndian: littleEndian ?? element.littleEndian,
-                localOffset: propertyLocalOffset,
+                localOffset: elementLocalOffset,
                 getBaseOffset
             };
-            return propertyContext;
+            return elementContext;
         };
         // Element getter
         const getterMap = new Map<number, () => T>();
@@ -563,7 +563,7 @@ export function defineArray<T>(element: TypeDefinition<T>, length: number, custo
                 view,
                 offset: getBaseOffset() + localOffset + index * element.size,
                 littleEndian: littleEndian ?? element.littleEndian,
-            }, value[index]);
+            }, value);
             return true;
         };
         const has: ProxyHandler<Array<T>>["has"] = (target, key) => {
