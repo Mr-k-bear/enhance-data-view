@@ -314,7 +314,7 @@ export function defineStruct<T extends Record<StructDefinitionKey, any> = {}>(na
         const { view, littleEndian, localOffset, getBaseOffset } = context;
         const { properties, keys } = typeDefinition;
         // Used to create property type operation context
-        const createPropertyContext = (property: StructDefinitionProperty<any>): OperationReactiveContext => {
+        const createContext = (property: StructDefinitionProperty<any>): OperationReactiveContext => {
             const propertyLocalOffset = localOffset + property.offset;
             const propertyContext: OperationReactiveContext = {
                 view,
@@ -339,29 +339,23 @@ export function defineStruct<T extends Record<StructDefinitionKey, any> = {}>(na
             if (!property) {
                 return void 0;
             }
-            const propertyContext = createPropertyContext(property);
+            const propertyContext = createContext(property);
             const propertyGetter = property.type.reactive ?? property.type.getter;
             getter = () => propertyGetter(propertyContext);
             getterMap.set(key, getter);
             return getter();
         };
         // Property setter
-        const setterMap = new Map<StructDefinitionKey, (value: any) => void>();
         const set: ProxyHandler<T>["set"] = (target, key, value) => {
-            let setter = setterMap.get(key);
-            if (setter) {
-                setter(value);
-                return true;
-            }
             const property = properties.get(key);
             if (!property) {
                 return false;
             }
-            const propertyContext = createPropertyContext(property);
-            const propertySetter = property.type.setter;
-            setter = (newValue) => propertySetter(propertyContext, newValue);
-            setterMap.set(key, setter);
-            setter(value);
+            property.type.setter({
+                view,
+                offset: getBaseOffset() + localOffset + property.offset,
+                littleEndian: littleEndian ?? property.type.littleEndian,
+            }, value);
             return true;
         };
         const has: ProxyHandler<T>["has"] = (target, key) => {
