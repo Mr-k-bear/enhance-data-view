@@ -18,10 +18,10 @@ export type OperationSetter<T> = (context: OperationContext, value: T) => void;
 
 export type OperationReactive<T> = (context: OperationReactiveContext) => T;
 
-export const isTypeDefinitionSymbol = Symbol("IsTypeDefinition");
+export const isTypeDefSymbol = Symbol("IsTypeDef");
 
-export interface TypeDefinition<T> {
-    [isTypeDefinitionSymbol]: true;
+export interface TypeDef<T> {
+    [isTypeDefSymbol]: true;
     name: string;
     size: number;
     align?: number;
@@ -31,83 +31,83 @@ export interface TypeDefinition<T> {
     reactive?: OperationReactive<T>;
 }
 
-export function isTypeDefinition(test: any): test is TypeDefinition<any> {
+export function isTypeDef(test: any): test is TypeDef<any> {
     if (typeof test !== "object" || test === null) {
         return false;
     }
-    if ((test as any)[isTypeDefinitionSymbol]) {
+    if ((test as any)[isTypeDefSymbol]) {
         return true;
     }
     return false;
 }
 
-export interface TypeDefinitionContext<T> extends TypeDefinition<T> {
-    setName(name?: string): TypeDefinitionContext<T>;
-    setSize(size?: number): TypeDefinitionContext<T>;
-    setAlign(align?: number): TypeDefinitionContext<T>;
-    setLittleEndian(littleEndian?: boolean): TypeDefinitionContext<T>;
-    setGetter(getter?: OperationGetter<T>): TypeDefinitionContext<T>;
-    setSetter(setter?: OperationSetter<T>): TypeDefinitionContext<T>;
-    setReactive(reactive?: OperationReactive<T>): TypeDefinitionContext<T>;
-    freeze(): TypeDefinitionContext<T>;
-    clone(name?: string): TypeDefinitionContext<T>;
+export interface TypeDefContext<T> extends TypeDef<T> {
+    setName(name?: string): TypeDefContext<T>;
+    setSize(size?: number): TypeDefContext<T>;
+    setAlign(align?: number): TypeDefContext<T>;
+    setLittleEndian(littleEndian?: boolean): TypeDefContext<T>;
+    setGetter(getter?: OperationGetter<T>): TypeDefContext<T>;
+    setSetter(setter?: OperationSetter<T>): TypeDefContext<T>;
+    setReactive(reactive?: OperationReactive<T>): TypeDefContext<T>;
+    freeze(): TypeDefContext<T>;
+    clone(name?: string): TypeDefContext<T>;
 }
 
-export function defineType<T = any>(name?: string): TypeDefinitionContext<T> {
+export function defineType<T = any>(name?: string): TypeDefContext<T> {
     let isFreeze = false;
     const testFreeze = (): void => {
         if (isFreeze) {
             throw new Error();
         }
     }
-    const setName: TypeDefinitionContext<T>["setName"] = (name) => {
+    const setName: TypeDefContext<T>["setName"] = (name) => {
         testFreeze();
-        typeDefinition.name = name ?? "unknown";
-        return typeDefinition;
+        typeDef.name = name ?? "unknown";
+        return typeDef;
     };
-    const setSize: TypeDefinitionContext<T>["setSize"] = (size) => {
+    const setSize: TypeDefContext<T>["setSize"] = (size) => {
         testFreeze();
-        typeDefinition.size = size ?? 0;
-        return typeDefinition;
+        typeDef.size = size ?? 0;
+        return typeDef;
     };
-    const setAlign: TypeDefinitionContext<T>["setAlign"] = (align) => {
+    const setAlign: TypeDefContext<T>["setAlign"] = (align) => {
         testFreeze();
-        typeDefinition.align = align;
-        return typeDefinition;
+        typeDef.align = align;
+        return typeDef;
     };
-    const setLittleEndian: TypeDefinitionContext<T>["setLittleEndian"] = (littleEndian) => {
+    const setLittleEndian: TypeDefContext<T>["setLittleEndian"] = (littleEndian) => {
         testFreeze();
-        typeDefinition.littleEndian = littleEndian;
-        return typeDefinition;
+        typeDef.littleEndian = littleEndian;
+        return typeDef;
     };
-    const setGetter: TypeDefinitionContext<T>["setGetter"] = (newGetter) => {
+    const setGetter: TypeDefContext<T>["setGetter"] = (newGetter) => {
         testFreeze();
-        typeDefinition.getter = newGetter ?? getter;
-        return typeDefinition;
+        typeDef.getter = newGetter ?? getter;
+        return typeDef;
     };
-    const setSetter: TypeDefinitionContext<T>["setSetter"] = (newSetter) => {
+    const setSetter: TypeDefContext<T>["setSetter"] = (newSetter) => {
         testFreeze();
-        typeDefinition.setter = newSetter ?? setter;
-        return typeDefinition;
+        typeDef.setter = newSetter ?? setter;
+        return typeDef;
     };
-    const setReactive: TypeDefinitionContext<T>["setReactive"] = (reactive) => {
+    const setReactive: TypeDefContext<T>["setReactive"] = (reactive) => {
         testFreeze();
-        typeDefinition.reactive = reactive;
-        return typeDefinition;
+        typeDef.reactive = reactive;
+        return typeDef;
     };
-    const freeze: TypeDefinitionContext<T>["freeze"] = () => {
+    const freeze: TypeDefContext<T>["freeze"] = () => {
         isFreeze = true;
-        Object.freeze(typeDefinition);
-        return typeDefinition;
+        Object.freeze(typeDef);
+        return typeDef;
     };
-    const clone: TypeDefinitionContext<T>["clone"] = (name) => {
-        const newInstance = defineType<T>(name ?? typeDefinition.name);
-        newInstance.size = typeDefinition.size;
-        newInstance.align = typeDefinition.align;
-        newInstance.littleEndian = typeDefinition.littleEndian;
-        newInstance.getter = typeDefinition.getter;
-        newInstance.setter = typeDefinition.setter;
-        newInstance.reactive = typeDefinition.reactive;
+    const clone: TypeDefContext<T>["clone"] = (name) => {
+        const newInstance = defineType<T>(name ?? typeDef.name);
+        newInstance.size = typeDef.size;
+        newInstance.align = typeDef.align;
+        newInstance.littleEndian = typeDef.littleEndian;
+        newInstance.getter = typeDef.getter;
+        newInstance.setter = typeDef.setter;
+        newInstance.reactive = typeDef.reactive;
         return newInstance;
     };
     const getter: OperationGetter<T> = () => {
@@ -116,8 +116,8 @@ export function defineType<T = any>(name?: string): TypeDefinitionContext<T> {
     const setter: OperationSetter<T> = () => {
         throw new Error();
     };
-    const typeDefinition: TypeDefinitionContext<T> = {
-        [isTypeDefinitionSymbol]: true,
+    const typeDef: TypeDefContext<T> = {
+        [isTypeDefSymbol]: true,
         name: name ?? "unknown",
         size: 0,
         getter,
@@ -132,51 +132,51 @@ export function defineType<T = any>(name?: string): TypeDefinitionContext<T> {
         freeze,
         clone
     };
-    return typeDefinition;
+    return typeDef;
 }
 
 type Flatten<T> = {} & { [K in keyof T]: T[K] };
 
-export type StructDefinitionKey = string | symbol;
+export type StructDefKey = string | symbol;
 
-export interface StructDefinitionProperty<T> {
-    key: StructDefinitionKey;
-    type: TypeDefinition<T>;
+export interface StructDefProp<T> {
+    key: StructDefKey;
+    type: TypeDef<T>;
     offset: number;
     staticOffset?: number;
     padding?: boolean;
 }
 
-export interface StructDefinitionPropertyOptions<T> {
-    type: TypeDefinition<T>;
+export interface StructDefPropOptions<T> {
+    type: TypeDef<T>;
     order?: number;
     offset?: number;
     padding?: boolean;
 }
 
-export type StructDefinitionOptions<T extends Record<StructDefinitionKey, any>> = {
-    [K in keyof T]: TypeDefinition<T[K]> | StructDefinitionPropertyOptions<T[K]>
+export type StructDefOptions<T extends Record<StructDefKey, any>> = {
+    [K in keyof T]: TypeDef<T[K]> | StructDefPropOptions<T[K]>
 }
 
-export interface StructDefinitionContext<T extends Record<StructDefinitionKey, any>> extends TypeDefinition<T> {
+export interface StructDefContext<T extends Record<StructDefKey, any>> extends TypeDef<T> {
     maxAlign: number;
-    keys: ReadonlyArray<StructDefinitionKey>;
-    properties: ReadonlyMap<StructDefinitionKey, StructDefinitionProperty<any>>;
-    propertyList: Array<StructDefinitionProperty<any>>;
-    setName(name: string): StructDefinitionContext<T>;
-    setAlign(align?: number): StructDefinitionContext<T>;
-    setLittleEndian(littleEndian?: boolean): StructDefinitionContext<T>;
-    updateLayout(): StructDefinitionContext<T>;
-    setOptions<M extends Record<StructDefinitionKey, any>>(options: StructDefinitionOptions<M>): StructDefinitionContext<M>;
-    addProperty<K extends StructDefinitionKey, V>(key: K extends keyof T ? never : K, type: TypeDefinition<V>, offset?: number): StructDefinitionContext<Flatten<T & { [X in K]: V }>>;
-    addPadding(type: TypeDefinition<any>, offset?: number): StructDefinitionContext<T>;
-    updateProperty<K extends keyof T, V>(key: K, type: TypeDefinition<V>, offset?: number): StructDefinitionContext<Flatten<Omit<T, K> & { [P in K]: V }>>;
-    removeProperty<K extends keyof T>(key: K): StructDefinitionContext<Flatten<Omit<T, K>>>;
-    freeze(): StructDefinitionContext<T>;
-    clone(name?: string): StructDefinitionContext<T>;
+    keys: ReadonlyArray<StructDefKey>;
+    props: ReadonlyMap<StructDefKey, StructDefProp<any>>;
+    propList: Array<StructDefProp<any>>;
+    setName(name: string): StructDefContext<T>;
+    setAlign(align?: number): StructDefContext<T>;
+    setLittleEndian(littleEndian?: boolean): StructDefContext<T>;
+    updateLayout(): StructDefContext<T>;
+    setOptions<M extends Record<StructDefKey, any>>(options: StructDefOptions<M>): StructDefContext<M>;
+    addProp<K extends StructDefKey, V>(key: K extends keyof T ? never : K, type: TypeDef<V>, offset?: number): StructDefContext<Flatten<T & { [X in K]: V }>>;
+    addPadding(type: TypeDef<any>, offset?: number): StructDefContext<T>;
+    updateProp<K extends keyof T, V>(key: K, type: TypeDef<V>, offset?: number): StructDefContext<Flatten<Omit<T, K> & { [P in K]: V }>>;
+    removeProp<K extends keyof T>(key: K): StructDefContext<Flatten<Omit<T, K>>>;
+    freeze(): StructDefContext<T>;
+    clone(name?: string): StructDefContext<T>;
 }
 
-export function defineStruct<T extends Record<StructDefinitionKey, any> = {}>(options: StructDefinitionOptions<T>, customName?: string): StructDefinitionContext<T> {
+export function defineStruct<T extends Record<StructDefKey, any> = {}>(options: StructDefOptions<T>, customName?: string): StructDefContext<T> {
     let isFreeze = false;
     const testFreeze = (): void => {
         if (isFreeze) {
@@ -185,61 +185,61 @@ export function defineStruct<T extends Record<StructDefinitionKey, any> = {}>(op
     }
     const updateLayout = () => {
         testFreeze();
-        const { propertyList } = typeDefinition;
-        const keys = new Array<StructDefinitionKey>;
-        const properties = new Map<StructDefinitionKey, StructDefinitionProperty<any>>();
+        const { propList } = typeDef;
+        const keys = new Array<StructDefKey>;
+        const props = new Map<StructDefKey, StructDefProp<any>>();
         let maxAlign: number = 1;
         let offset: number = 0;
-        for (const property of propertyList) {
-            if (!property.padding) {
-                keys.push(property.key);
-                properties.set(property.key, property);
+        for (const prop of propList) {
+            if (!prop.padding) {
+                keys.push(prop.key);
+                props.set(prop.key, prop);
             }
             // Static offset
-            if (typeof property.staticOffset === "number") {
-                offset = property.staticOffset;
-                property.offset = offset;
+            if (typeof prop.staticOffset === "number") {
+                offset = prop.staticOffset;
+                prop.offset = offset;
                 continue;
             }
             // Update max align
-            const align = Math.max(property.type.align ?? property.type.size, 1);
+            const align = Math.max(prop.type.align ?? prop.type.size, 1);
             maxAlign = Math.max(maxAlign, align);
             // Padding calculation
             const padding = (align - (offset % align)) % align;
             // Update offset
-            offset += padding + property.type.size
-            property.offset = offset;
+            offset += padding + prop.type.size
+            prop.offset = offset;
         }
         // End padding
         const endPadding = (maxAlign - (offset % maxAlign)) % maxAlign;
         offset += endPadding;
         // Update
-        typeDefinition.maxAlign = maxAlign;
-        typeDefinition.size = offset;
-        typeDefinition.keys = keys;
-        typeDefinition.properties = properties;
-        return typeDefinition;
+        typeDef.maxAlign = maxAlign;
+        typeDef.size = offset;
+        typeDef.keys = keys;
+        typeDef.props = props;
+        return typeDef;
     };
-    const setName: StructDefinitionContext<T>["setName"] = (name) => {
+    const setName: StructDefContext<T>["setName"] = (name) => {
         testFreeze();
-        typeDefinition.name = name ?? "unknown";
-        return typeDefinition;
+        typeDef.name = name ?? "unknown";
+        return typeDef;
     };
-    const setAlign: StructDefinitionContext<T>["setAlign"] = (align) => {
+    const setAlign: StructDefContext<T>["setAlign"] = (align) => {
         testFreeze();
-        typeDefinition.align = align;
-        return typeDefinition;
+        typeDef.align = align;
+        return typeDef;
     };
-    const setLittleEndian: StructDefinitionContext<T>["setLittleEndian"] = (littleEndian) => {
+    const setLittleEndian: StructDefContext<T>["setLittleEndian"] = (littleEndian) => {
         testFreeze();
-        typeDefinition.littleEndian = littleEndian;
-        return typeDefinition;
+        typeDef.littleEndian = littleEndian;
+        return typeDef;
     };
-    const setOptions: StructDefinitionContext<T>["setOptions"] = (options) => {
-        const orderList: Array<StructDefinitionPropertyOptions<any> & { key: StructDefinitionKey, order: number }> = [];
-        const list: Array<StructDefinitionPropertyOptions<any> & { key: StructDefinitionKey }> = [];
+    const setOptions: StructDefContext<T>["setOptions"] = (options) => {
+        const orderList: Array<StructDefPropOptions<any> & { key: StructDefKey, order: number }> = [];
+        const list: Array<StructDefPropOptions<any> & { key: StructDefKey }> = [];
         for (const [key, value] of Object.entries(options)) {
-            if (isTypeDefinition(value)) {
+            if (isTypeDef(value)) {
                 list.push({ key: key, type: value });
                 continue;
             }
@@ -255,7 +255,7 @@ export function defineStruct<T extends Record<StructDefinitionKey, any> = {}>(op
             const alignB = b.type.align ?? b.type.size;
             return alignB - alignA;
         });
-        const mapToProperty = (options: StructDefinitionPropertyOptions<any> & { key: StructDefinitionKey }): StructDefinitionProperty<any> => {
+        const mapToProp = (options: StructDefPropOptions<any> & { key: StructDefKey }): StructDefProp<any> => {
             return {
                 key: options.key,
                 type: options.type,
@@ -264,102 +264,102 @@ export function defineStruct<T extends Record<StructDefinitionKey, any> = {}>(op
                 padding: options.padding
             }
         }
-        typeDefinition.propertyList = [...orderList.map(mapToProperty), ...list.map(mapToProperty)];
-        return updateLayout() as StructDefinitionContext<any>;
+        typeDef.propList = [...orderList.map(mapToProp), ...list.map(mapToProp)];
+        return updateLayout() as StructDefContext<any>;
     };
-    const pushProperty = (property: StructDefinitionProperty<any>): StructDefinitionContext<T> => {
+    const pushProp = (prop: StructDefProp<any>): StructDefContext<T> => {
         testFreeze();
-        const { properties, propertyList } = typeDefinition;
+        const { props, propList } = typeDef;
         // Duplicate Check
-        if (properties.has(property.key)) {
+        if (props.has(prop.key)) {
             throw new Error();
         }
         // Update
-        propertyList.push(property);
+        propList.push(prop);
         return updateLayout();
     };
-    const addProperty: StructDefinitionContext<T>["addProperty"] = (key, type, staticOffset) => pushProperty({
+    const addProp: StructDefContext<T>["addProp"] = (key, type, staticOffset) => pushProp({
         key: key,
         type: type,
         offset: 0,
         staticOffset
     });
-    const addPadding: StructDefinitionContext<T>["addPadding"] = (type, staticOffset) => pushProperty({
+    const addPadding: StructDefContext<T>["addPadding"] = (type, staticOffset) => pushProp({
         key: Symbol("padding"),
         type: type,
         offset: 0,
         staticOffset,
         padding: true
     });
-    const updateProperty: StructDefinitionContext<T>["updateProperty"] = (key, type, staticOffset) => {
+    const updateProp: StructDefContext<T>["updateProp"] = (key, type, staticOffset) => {
         testFreeze();
-        const { properties } = typeDefinition;
-        const property = properties.get(key as StructDefinitionKey);
-        if (!property) {
+        const { props } = typeDef;
+        const prop = props.get(key as StructDefKey);
+        if (!prop) {
             throw new Error();
         }
         // Update
-        property.type = type;
-        property.staticOffset = staticOffset;
-        return updateLayout() as StructDefinitionContext<any>;
+        prop.type = type;
+        prop.staticOffset = staticOffset;
+        return updateLayout() as StructDefContext<any>;
     };
-    const removeProperty: StructDefinitionContext<T>["removeProperty"] = (key) => {
+    const removeProp: StructDefContext<T>["removeProp"] = (key) => {
         testFreeze();
-        const { propertyList } = typeDefinition;
-        const propertyIndex = propertyList.findIndex(property => property.key === key);
-        if (propertyIndex < 0) {
+        const { propList } = typeDef;
+        const propIndex = propList.findIndex(prop => prop.key === key);
+        if (propIndex < 0) {
             throw new Error();
         }
         // Delete
-        propertyList.splice(propertyIndex, 1);
-        return updateLayout() as StructDefinitionContext<any>;
+        propList.splice(propIndex, 1);
+        return updateLayout() as StructDefContext<any>;
     };
-    const freeze: StructDefinitionContext<T>["freeze"] = () => {
+    const freeze: StructDefContext<T>["freeze"] = () => {
         isFreeze = true;
-        for (const property of typeDefinition.propertyList) {
-            Object.freeze(property);
+        for (const prop of typeDef.propList) {
+            Object.freeze(prop);
         }
-        Object.freeze(typeDefinition.keys);
-        Object.freeze(typeDefinition.properties);
-        Object.freeze(typeDefinition.propertyList);
-        Object.freeze(typeDefinition);
-        return typeDefinition;
+        Object.freeze(typeDef.keys);
+        Object.freeze(typeDef.props);
+        Object.freeze(typeDef.propList);
+        Object.freeze(typeDef);
+        return typeDef;
     };
-    const clone: StructDefinitionContext<T>["clone"] = (name) => {
-        const newInstance = defineStruct<T>({} as any, name ?? typeDefinition.name);
-        newInstance.size = typeDefinition.size;
-        newInstance.align = typeDefinition.align;
-        newInstance.littleEndian = typeDefinition.littleEndian;
-        newInstance.maxAlign = typeDefinition.maxAlign;
-        for (const property of typeDefinition.propertyList) {
-            newInstance.propertyList.push({
-                key: property.key,
-                type: property.type,
-                offset: property.offset,
-                staticOffset: property.staticOffset,
-                padding: property.padding
+    const clone: StructDefContext<T>["clone"] = (name) => {
+        const newInstance = defineStruct<T>({} as any, name ?? typeDef.name);
+        newInstance.size = typeDef.size;
+        newInstance.align = typeDef.align;
+        newInstance.littleEndian = typeDef.littleEndian;
+        newInstance.maxAlign = typeDef.maxAlign;
+        for (const prop of typeDef.propList) {
+            newInstance.propList.push({
+                key: prop.key,
+                type: prop.type,
+                offset: prop.offset,
+                staticOffset: prop.staticOffset,
+                padding: prop.padding
             });
         }
         return newInstance.updateLayout();
     };
     const getter: OperationGetter<T> = ({ view, offset, littleEndian }) => {
-        const structure: Record<StructDefinitionKey, any> = {};
-        for (const [, property] of typeDefinition.properties) {
-            structure[property.key] = property.type.getter({
+        const structure: Record<StructDefKey, any> = {};
+        for (const [, prop] of typeDef.props) {
+            structure[prop.key] = prop.type.getter({
                 view,
-                offset: offset + property.offset,
-                littleEndian: littleEndian ?? property.type.littleEndian,
+                offset: offset + prop.offset,
+                littleEndian: littleEndian ?? prop.type.littleEndian,
             });
         }
         return structure as T;
     };
     const setter: OperationSetter<T> = ({ view, offset, littleEndian }, value) => {
-        for (const [, property] of typeDefinition.properties) {
-            property.type.setter({
+        for (const [, prop] of typeDef.props) {
+            prop.type.setter({
                 view,
-                offset: offset + property.offset,
-                littleEndian: littleEndian ?? property.type.littleEndian,
-            }, value[property.key]);
+                offset: offset + prop.offset,
+                littleEndian: littleEndian ?? prop.type.littleEndian,
+            }, value[prop.key]);
         }
     };
     const reactive: OperationReactive<T> = (context) => {
@@ -370,54 +370,54 @@ export function defineStruct<T extends Record<StructDefinitionKey, any> = {}>(op
         }
         // Create proxy
         const { view, littleEndian, localOffset, getBaseOffset } = context;
-        const { properties, keys } = typeDefinition;
-        // Used to create property type operation context
-        const createContext = (property: StructDefinitionProperty<any>): OperationReactiveContext => {
-            const propertyLocalOffset = localOffset + property.offset;
-            const propertyContext: OperationReactiveContext = {
+        const { props, keys } = typeDef;
+        // Used to create prop type operation context
+        const createContext = (prop: StructDefProp<any>): OperationReactiveContext => {
+            const propLocalOffset = localOffset + prop.offset;
+            const propContext: OperationReactiveContext = {
                 view,
                 // Adapt to regular types
                 get offset() {
-                    return getBaseOffset() + propertyLocalOffset;
+                    return getBaseOffset() + propLocalOffset;
                 },
-                littleEndian: littleEndian ?? property.type.littleEndian,
-                localOffset: propertyLocalOffset,
+                littleEndian: littleEndian ?? prop.type.littleEndian,
+                localOffset: propLocalOffset,
                 getBaseOffset
             };
-            return propertyContext;
+            return propContext;
         };
-        // Property getter
-        const getterMap = new Map<StructDefinitionKey, () => any>();
+        // Prop getter
+        const getterMap = new Map<StructDefKey, () => any>();
         const get: ProxyHandler<T>["get"] = (target, key) => {
             let getter = getterMap.get(key);
             if (getter) {
                 return getter();
             }
-            const property = properties.get(key);
-            if (!property) {
+            const prop = props.get(key);
+            if (!prop) {
                 return void 0;
             }
-            const propertyContext = createContext(property);
-            const propertyGetter = property.type.reactive ?? property.type.getter;
-            getter = () => propertyGetter(propertyContext);
+            const propContext = createContext(prop);
+            const propGetter = prop.type.reactive ?? prop.type.getter;
+            getter = () => propGetter(propContext);
             getterMap.set(key, getter);
             return getter();
         };
-        // Property setter
+        // Prop setter
         const set: ProxyHandler<T>["set"] = (target, key, value) => {
-            const property = properties.get(key);
-            if (!property) {
+            const prop = props.get(key);
+            if (!prop) {
                 return false;
             }
-            property.type.setter({
+            prop.type.setter({
                 view,
-                offset: getBaseOffset() + localOffset + property.offset,
-                littleEndian: littleEndian ?? property.type.littleEndian,
+                offset: getBaseOffset() + localOffset + prop.offset,
+                littleEndian: littleEndian ?? prop.type.littleEndian,
             }, value);
             return true;
         };
         const has: ProxyHandler<T>["has"] = (target, key) => {
-            return properties.has(key);
+            return props.has(key);
         };
         const ownKeys: ProxyHandler<T>["ownKeys"] = () => {
             return keys;
@@ -433,10 +433,10 @@ export function defineStruct<T extends Record<StructDefinitionKey, any> = {}>(op
     }
     let name: string | undefined = customName;
     let align: number | undefined;
-    const typeDefinition: StructDefinitionContext<T> = {
-        [isTypeDefinitionSymbol]: true,
+    const typeDef: StructDefContext<T> = {
+        [isTypeDefSymbol]: true,
         get name() {
-            return name ?? `struct{${typeDefinition.keys.length}}`
+            return name ?? `struct{${typeDef.keys.length}}`
         },
         set name(value) {
             testFreeze();
@@ -444,7 +444,7 @@ export function defineStruct<T extends Record<StructDefinitionKey, any> = {}>(op
         },
         size: 0,
         get align() {
-            return align ?? typeDefinition.maxAlign;
+            return align ?? typeDef.maxAlign;
         },
         set align(value) {
             testFreeze();
@@ -455,83 +455,83 @@ export function defineStruct<T extends Record<StructDefinitionKey, any> = {}>(op
         reactive,
         maxAlign: 1,
         keys: [],
-        properties: new Map(),
-        propertyList: [],
+        props: new Map(),
+        propList: [],
         setName,
         setAlign,
         setLittleEndian,
         updateLayout,
         setOptions,
-        addProperty,
+        addProp,
         addPadding,
-        updateProperty,
-        removeProperty,
+        updateProp,
+        removeProp,
         freeze,
         clone
     }
-    return typeDefinition;
+    return typeDef;
 }
 
-export interface ArrayDefinitionContext<T = any> extends TypeDefinition<Array<T>> {
-    element: TypeDefinition<T>;
+export interface ArrayDefContext<T = any> extends TypeDef<Array<T>> {
+    element: TypeDef<T>;
     length: number;
-    setName(name: string): ArrayDefinitionContext<T>;
-    setAlign(align?: number): ArrayDefinitionContext<T>;
-    setLittleEndian(littleEndian?: boolean): ArrayDefinitionContext<T>;
-    setElement<M>(type: TypeDefinition<M>): ArrayDefinitionContext<M>;
-    setLength(length: number): ArrayDefinitionContext<T>;
-    freeze(): ArrayDefinitionContext<T>;
-    clone(name?: string): ArrayDefinitionContext<T>;
+    setName(name: string): ArrayDefContext<T>;
+    setAlign(align?: number): ArrayDefContext<T>;
+    setLittleEndian(littleEndian?: boolean): ArrayDefContext<T>;
+    setElement<M>(type: TypeDef<M>): ArrayDefContext<M>;
+    setLength(length: number): ArrayDefContext<T>;
+    freeze(): ArrayDefContext<T>;
+    clone(name?: string): ArrayDefContext<T>;
 }
 
-export function defineArray<T>(element: TypeDefinition<T>, length: number, customName?: string): ArrayDefinitionContext<T> {
+export function defineArray<T>(element: TypeDef<T>, length: number, customName?: string): ArrayDefContext<T> {
     let isFreeze = false;
     const testFreeze = (): void => {
         if (isFreeze) {
             throw new Error();
         }
     }
-    const setName: ArrayDefinitionContext<T>["setName"] = (name) => {
+    const setName: ArrayDefContext<T>["setName"] = (name) => {
         testFreeze();
-        typeDefinition.name = name ?? "unknown";
-        return typeDefinition;
+        typeDef.name = name ?? "unknown";
+        return typeDef;
     };
-    const setAlign: ArrayDefinitionContext<T>["setAlign"] = (align) => {
+    const setAlign: ArrayDefContext<T>["setAlign"] = (align) => {
         testFreeze();
-        typeDefinition.align = align;
-        return typeDefinition;
+        typeDef.align = align;
+        return typeDef;
     };
-    const setLittleEndian: ArrayDefinitionContext<T>["setLittleEndian"] = (littleEndian) => {
+    const setLittleEndian: ArrayDefContext<T>["setLittleEndian"] = (littleEndian) => {
         testFreeze();
-        typeDefinition.littleEndian = littleEndian;
-        return typeDefinition;
+        typeDef.littleEndian = littleEndian;
+        return typeDef;
     };
-    const setElement: ArrayDefinitionContext<T>["setElement"] = (element: TypeDefinition<any>) => {
+    const setElement: ArrayDefContext<T>["setElement"] = (element: TypeDef<any>) => {
         testFreeze();
-        typeDefinition.element = element;
-        typeDefinition.size = element.size * typeDefinition.length;
-        return typeDefinition as ArrayDefinitionContext<any>;
+        typeDef.element = element;
+        typeDef.size = element.size * typeDef.length;
+        return typeDef as ArrayDefContext<any>;
     };
-    const setLength: ArrayDefinitionContext<T>["setLength"] = (length) => {
+    const setLength: ArrayDefContext<T>["setLength"] = (length) => {
         testFreeze();
-        typeDefinition.length = length;
-        typeDefinition.size = typeDefinition.element.size * length;
-        return typeDefinition;
+        typeDef.length = length;
+        typeDef.size = typeDef.element.size * length;
+        return typeDef;
     };
-    const freeze: ArrayDefinitionContext<T>["freeze"] = () => {
+    const freeze: ArrayDefContext<T>["freeze"] = () => {
         isFreeze = true;
-        Object.freeze(typeDefinition);
-        return typeDefinition;
+        Object.freeze(typeDef);
+        return typeDef;
     };
-    const clone: ArrayDefinitionContext<T>["clone"] = (newName) => {
-        const newInstance = defineArray<T>(typeDefinition.element, typeDefinition.length, newName ?? name);
-        newInstance.size = typeDefinition.size;
-        newInstance.align = typeDefinition.align;
-        newInstance.littleEndian = typeDefinition.littleEndian;
+    const clone: ArrayDefContext<T>["clone"] = (newName) => {
+        const newInstance = defineArray<T>(typeDef.element, typeDef.length, newName ?? name);
+        newInstance.size = typeDef.size;
+        newInstance.align = typeDef.align;
+        newInstance.littleEndian = typeDef.littleEndian;
         return newInstance;
     };
     const getter: OperationGetter<Array<T>> = ({ view, offset, littleEndian }) => {
-        const { element, length } = typeDefinition;
+        const { element, length } = typeDef;
         const array: Array<T> = [];
         for (let index = 0; index < length; index++) {
             array.push(element.getter({
@@ -543,7 +543,7 @@ export function defineArray<T>(element: TypeDefinition<T>, length: number, custo
         return array;
     };
     const setter: OperationSetter<Array<T>> = ({ view, offset, littleEndian }, value) => {
-        const { element, length } = typeDefinition;
+        const { element, length } = typeDef;
         for (let index = 0; index < length; index++) {
             element.setter({
                 view,
@@ -560,7 +560,7 @@ export function defineArray<T>(element: TypeDefinition<T>, length: number, custo
         }
         // Create proxy
         const { view, littleEndian, localOffset, getBaseOffset } = context;
-        const { element, length } = typeDefinition;
+        const { element, length } = typeDef;
         // Used to create element type operation context
         const createContext = (index: number): OperationReactiveContext => {
             const elementLocalOffset = localOffset + index * element.size;
@@ -595,7 +595,7 @@ export function defineArray<T>(element: TypeDefinition<T>, length: number, custo
                 yield getElement(index);
             }
         }
-        // Built-in properties
+        // Built-in props
         const internal = new Map<symbol | string, any>([
             ["length", length],
             [Symbol.iterator, iterator]
@@ -668,10 +668,10 @@ export function defineArray<T>(element: TypeDefinition<T>, length: number, custo
     };
     let name: string | undefined = customName;
     let align: number | undefined;
-    const typeDefinition: ArrayDefinitionContext<T> = {
-        [isTypeDefinitionSymbol]: true,
+    const typeDef: ArrayDefContext<T> = {
+        [isTypeDefSymbol]: true,
         get name() {
-            return name ?? `${typeDefinition.element.name}[${typeDefinition.length}]`
+            return name ?? `${typeDef.element.name}[${typeDef.length}]`
         },
         set name(value) {
             testFreeze();
@@ -679,7 +679,7 @@ export function defineArray<T>(element: TypeDefinition<T>, length: number, custo
         },
         size: 0,
         get align() {
-            return align ?? typeDefinition.element.align;
+            return align ?? typeDef.element.align;
         },
         set align(value) {
             testFreeze();
@@ -698,5 +698,5 @@ export function defineArray<T>(element: TypeDefinition<T>, length: number, custo
         freeze,
         clone
     };
-    return typeDefinition;
+    return typeDef;
 }
