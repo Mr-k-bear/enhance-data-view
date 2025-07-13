@@ -18,7 +18,10 @@ export type OperationSetter<T> = (context: OperationContext, value: T) => void;
 
 export type OperationReactive<T> = (context: OperationReactiveContext) => T;
 
+export const isTypeDefinitionSymbol = Symbol("IsTypeDefinition");
+
 export interface TypeDefinition<T> {
+    [isTypeDefinitionSymbol]: true;
     name: string;
     size: number;
     align?: number;
@@ -26,6 +29,16 @@ export interface TypeDefinition<T> {
     getter: OperationGetter<T>;
     setter: OperationSetter<T>;
     reactive?: OperationReactive<T>;
+}
+
+export function isTypeDefinition(test: any): test is TypeDefinition<any> {
+    if (typeof test !== "object" || test === null) {
+        return false;
+    }
+    if ((test as any)[isTypeDefinitionSymbol]) {
+        return true;
+    }
+    return false;
 }
 
 export interface TypeDefinitionContext<T> extends TypeDefinition<T> {
@@ -104,6 +117,7 @@ export function defineType<T = any>(name?: string): TypeDefinitionContext<T> {
         throw new Error();
     };
     const typeDefinition: TypeDefinitionContext<T> = {
+        [isTypeDefinitionSymbol]: true,
         name: name ?? "unknown",
         size: 0,
         getter,
@@ -133,6 +147,17 @@ export interface StructDefinitionProperty<T> {
     padding?: boolean;
 }
 
+export interface StructDefinitionPropertyOptions<T> {
+    type: TypeDefinition<T>;
+    order?: number;
+    offset?: number;
+    padding?: boolean;
+}
+
+export type StructDefinitionOptions<T extends Record<StructDefinitionKey, any>> = {
+    [K in keyof T]: TypeDefinition<T[K]> | StructDefinitionPropertyOptions<T[K]>
+}
+
 export interface StructDefinitionContext<T extends Record<StructDefinitionKey, any>> extends TypeDefinition<T> {
     maxAlign: number;
     keys: ReadonlyArray<StructDefinitionKey>;
@@ -142,6 +167,7 @@ export interface StructDefinitionContext<T extends Record<StructDefinitionKey, a
     setAlign(align?: number): StructDefinitionContext<T>;
     setLittleEndian(littleEndian?: boolean): StructDefinitionContext<T>;
     updateLayout(): StructDefinitionContext<T>;
+    setOptions<M extends Record<StructDefinitionKey, any>>(options: StructDefinitionOptions<M>): StructDefinitionContext<M>;
     addProperty<K extends StructDefinitionKey, V>(key: K extends keyof T ? never : K, type: TypeDefinition<V>, offset?: number): StructDefinitionContext<Flatten<T & { [X in K]: V }>>;
     addPadding(type: TypeDefinition<any>, offset?: number): StructDefinitionContext<T>;
     updateProperty<K extends keyof T, V>(key: K, type: TypeDefinition<V>, offset?: number): StructDefinitionContext<Flatten<Omit<T, K> & { [P in K]: V }>>;
@@ -150,7 +176,7 @@ export interface StructDefinitionContext<T extends Record<StructDefinitionKey, a
     clone(name?: string): StructDefinitionContext<T>;
 }
 
-export function defineStruct<T extends Record<StructDefinitionKey, any> = {}>(name?: string): StructDefinitionContext<T> {
+export function defineStruct<T extends Record<StructDefinitionKey, any> = {}>(options: StructDefinitionOptions<T>, customName?: string): StructDefinitionContext<T> {
     let isFreeze = false;
     const testFreeze = (): void => {
         if (isFreeze) {
@@ -208,6 +234,38 @@ export function defineStruct<T extends Record<StructDefinitionKey, any> = {}>(na
         testFreeze();
         typeDefinition.littleEndian = littleEndian;
         return typeDefinition;
+    };
+    const setOptions: StructDefinitionContext<T>["setOptions"] = (options) => {
+        const orderList: Array<StructDefinitionPropertyOptions<any> & { key: StructDefinitionKey, order: number }> = [];
+        const list: Array<StructDefinitionPropertyOptions<any> & { key: StructDefinitionKey }> = [];
+        for (const [key, value] of Object.entries(options)) {
+            if (isTypeDefinition(value)) {
+                list.push({ key: key, type: value });
+                continue;
+            }
+            if (typeof value.order === "number") {
+                orderList.push({ key: key, ...value });
+                continue;
+            }
+            list.push({ key: key, ...value });
+        }
+        orderList.sort((a, b) => a.order - b.order);
+        list.sort((a, b) => {
+            const alignA = a.type.align ?? a.type.size;
+            const alignB = b.type.align ?? b.type.size;
+            return alignB - alignA;
+        });
+        const mapToProperty = (options: StructDefinitionPropertyOptions<any> & { key: StructDefinitionKey }): StructDefinitionProperty<any> => {
+            return {
+                key: options.key,
+                type: options.type,
+                offset: 0,
+                staticOffset: options.offset,
+                padding: options.padding
+            }
+        }
+        typeDefinition.propertyList = [...orderList.map(mapToProperty), ...list.map(mapToProperty)];
+        return updateLayout() as StructDefinitionContext<any>;
     };
     const pushProperty = (property: StructDefinitionProperty<any>): StructDefinitionContext<T> => {
         testFreeze();
@@ -268,7 +326,7 @@ export function defineStruct<T extends Record<StructDefinitionKey, any> = {}>(na
         return typeDefinition;
     };
     const clone: StructDefinitionContext<T>["clone"] = (name) => {
-        const newInstance = defineStruct<T>(name ?? typeDefinition.name);
+        const newInstance = defineStruct<T>({} as any, name ?? typeDefinition.name);
         newInstance.size = typeDefinition.size;
         newInstance.align = typeDefinition.align;
         newInstance.littleEndian = typeDefinition.littleEndian;
@@ -373,9 +431,17 @@ export function defineStruct<T extends Record<StructDefinitionKey, any> = {}>(na
         context.state = proxy;
         return proxy;
     }
+    let name: string | undefined = customName;
     let align: number | undefined;
     const typeDefinition: StructDefinitionContext<T> = {
-        name: name ?? "unknown",
+        [isTypeDefinitionSymbol]: true,
+        get name() {
+            return name ?? `struct{${typeDefinition.keys.length}}`
+        },
+        set name(value) {
+            testFreeze();
+            name = value;
+        },
         size: 0,
         get align() {
             return align ?? typeDefinition.maxAlign;
@@ -395,6 +461,7 @@ export function defineStruct<T extends Record<StructDefinitionKey, any> = {}>(na
         setAlign,
         setLittleEndian,
         updateLayout,
+        setOptions,
         addProperty,
         addPadding,
         updateProperty,
@@ -602,6 +669,7 @@ export function defineArray<T>(element: TypeDefinition<T>, length: number, custo
     let name: string | undefined = customName;
     let align: number | undefined;
     const typeDefinition: ArrayDefinitionContext<T> = {
+        [isTypeDefinitionSymbol]: true,
         get name() {
             return name ?? `${typeDefinition.element.name}[${typeDefinition.length}]`
         },
