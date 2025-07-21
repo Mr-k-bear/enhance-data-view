@@ -153,17 +153,18 @@ export function defineArray<T>(param0?: TypeDefinition<T> | string, length?: num
             array.push(_element.getter({
                 view,
                 offset: offset + index * _element.size,
-                littleEndian: littleEndian
+                littleEndian
             }));
         }
         return array;
     };
     const setter: OperationSetter<Array<T>> = ({ view, offset, littleEndian }, value) => {
-        for (let index = 0; index < _length; index++) {
+        const minLength = Math.min(value.length, _length);
+        for (let index = 0; index < minLength; index++) {
             _element.setter({
                 view,
                 offset: offset + index * _element.size,
-                littleEndian: littleEndian
+                littleEndian
             }, value[index]);
         }
     };
