@@ -15,7 +15,7 @@ export interface ArrayDefinitionFreezed<T> extends TypeDefinition<Array<T>> {
      * if the length of the incoming data is less than the length of the array,
      * fill in the remaining positions with values, Default is not filled
      */
-    fill: T | undefined;
+    filler: T | undefined;
     /** Fixed length of the array */
     length: number;
     /**
@@ -63,12 +63,12 @@ export interface ArrayDefinition<T> extends ArrayDefinitionFreezed<T> {
      * Changes element type
      * @template M - New element type
      * @param type - New element type definition
-     * @param fill - When using an array setter, 
+     * @param filler - When using an array setter, 
      * if the length of the incoming data is less than the length of the array,
      * fill in the remaining positions with values, Default is not filled
      * @returns Current array definition with updated element type
      */
-    setElement<M>(type?: TypeDefinition<M>, fill?: M): ArrayDefinition<M>;
+    setElement<M>(type?: TypeDefinition<M>, filler?: M): ArrayDefinition<M>;
     /**
      * Changes array length
      * @param length - New element count
@@ -100,27 +100,30 @@ export function defineArray(name?: string): ArrayDefinition<unknown>;
  * @param element - Element type definition
  * @param length - Array element count
  * @param name - Optional array type name
- * @param fill - When using an array setter, 
+ * @param filler - When using an array setter, 
  * if the length of the incoming data is less than the length of the array,
  * fill in the remaining positions with values, Default is not filled
  * @returns Configured array definition
  * @template T - Element type
  * @example 
  */
-export function defineArray<T>(element: TypeDefinition<T>, length?: number, fill?: T, name?: string): ArrayDefinition<T>;
+export function defineArray<T>(element: TypeDefinition<T>, length?: number, filler?: T, name?: string): ArrayDefinition<T>;
 /**
  * Array definition implementation
  * @param param0 - Element type or name
  * @param length - Array length
  * @param name - Array name
+ * @param filler - When using an array setter, 
+ * if the length of the incoming data is less than the length of the array,
+ * fill in the remaining positions with values, Default is not filled
  * @returns Array definition instance
  */
-export function defineArray<T>(param0?: TypeDefinition<T> | string, length?: number, fill?: T, name?: string): ArrayDefinition<T> {
+export function defineArray<T>(param0?: TypeDefinition<T> | string, length?: number, filler?: T, name?: string): ArrayDefinition<T> {
     let _name: string | undefined;
     let _size: number | undefined;
     let _align: number | undefined;
     let _element: TypeDefinition<any> = UNKNOWN;
-    let _fill: any | undefined;
+    let _filler: any | undefined;
     let _length: number = 0;
     const setName: ArrayDefinition<T>["setName"] = (name) => {
         _name = name;
@@ -134,9 +137,9 @@ export function defineArray<T>(param0?: TypeDefinition<T> | string, length?: num
         _align = align;
         return typeDefinition;
     };
-    const setElement: ArrayDefinition<T>["setElement"] = (element, fill) => {
+    const setElement: ArrayDefinition<T>["setElement"] = (element, filler) => {
         _element = element ?? UNKNOWN;
-        _fill = fill;
+        _filler = filler;
         return typeDefinition as any;
     };
     const setLength: ArrayDefinition<T>["setLength"] = (length) => {
@@ -151,7 +154,7 @@ export function defineArray<T>(param0?: TypeDefinition<T> | string, length?: num
             size: newDefinition.size,
             align: newDefinition.align,
             element: newDefinition.element,
-            fill: newDefinition.fill,
+            filler: newDefinition.filler,
             length: newDefinition.length,
             getter: newDefinition.getter,
             setter: newDefinition.setter,
@@ -159,7 +162,7 @@ export function defineArray<T>(param0?: TypeDefinition<T> | string, length?: num
             clone: newDefinition.clone
         });
     };
-    const clone: ArrayDefinition<T>["clone"] = (name) => defineArray<T>(_element, _length, _fill, name ?? _name)
+    const clone: ArrayDefinition<T>["clone"] = (name) => defineArray<T>(_element, _length, _filler, name ?? _name)
         .setSize(_size)
         .setAlign(_align);
     const getter: OperationGetter<Array<T>> = ({ view, offset, littleEndian }) => {
@@ -183,13 +186,13 @@ export function defineArray<T>(param0?: TypeDefinition<T> | string, length?: num
                 littleEndian
             }, value[index]);
         }
-        if (_fill !== void 0 && valueLength < _length) {
+        if (_filler !== void 0 && valueLength < _length) {
             for (let index = valueLength; index < _length; index++) {
                 _element.setter({
                     view,
                     offset: offset + index * _element.size,
                     littleEndian
-                }, _fill);
+                }, _filler);
             }
         }
     };
@@ -359,8 +362,8 @@ export function defineArray<T>(param0?: TypeDefinition<T> | string, length?: num
         get element() {
             return _element;
         },
-        get fill() {
-            return _fill;
+        get filler() {
+            return _filler;
         },
         get length() {
             return _length;
@@ -377,7 +380,7 @@ export function defineArray<T>(param0?: TypeDefinition<T> | string, length?: num
         clone
     };
     if (typeof param0 === "object") {
-        setElement(param0, fill);
+        setElement(param0, filler);
         setLength(length);
         setName(name);
     }
