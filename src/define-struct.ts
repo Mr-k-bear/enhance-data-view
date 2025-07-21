@@ -258,6 +258,11 @@ export interface StructDefinition<T extends Record<StructKey, any>> extends Stru
      * @param type - New type definition
      * @param options - Configuration options
      * @returns Current struct definition with updated type
+     * @remarks
+     * - Maintains original property position in layout
+     * - Converts padding to property if key was padding
+     * - Preserves all other properties unchanged
+     * - Ideal for generic struct configurations
      * @template K - Property key to update
      * @template V - New property type
      */
@@ -268,6 +273,11 @@ export interface StructDefinition<T extends Record<StructKey, any>> extends Stru
      * @param typeOrSize - Type definition or byte size
      * @param options - Configuration options
      * @returns Current struct definition with updated type
+     * @remarks
+     * - Maintains original position in layout
+     * - Converts property to padding if key was property
+     * - Preserves all other properties unchanged
+     * - Padding keys become void in type system
      * @template K - Property key to update
      */
     updatePadding<K extends keyof T>(key: K, typeOrSize: TypeDefinition<any> | number, options?: { align?: number, offset?: number }): StructDefinition<Flatten<Omit<T, K> & { [P in K]: void }>>;

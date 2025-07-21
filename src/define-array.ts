@@ -3,23 +3,106 @@ import { UNKNOWN } from "./types";
 import type { OperationGetter, OperationSetter, OperationReactive } from "./core";
 import type { TypeDefinition, OperationContextDynamic } from "./core";
 
+/**
+ * Immutable array type definition (frozen state)
+ * @template T - Element type of the array
+ */
 export interface ArrayDefinitionFreezed<T> extends TypeDefinition<Array<T>> {
+    /** Type definition for array elements */
     element: TypeDefinition<T>;
+    /** Fixed length of the array */
     length: number;
+    /**
+     * Creates a mutable clone of the array definition
+     * @param name - Optional new name for cloned definition
+     * @returns New mutable array definition
+     * @example 
+     * const cloned = frozenArray.clone('RenamedArray');
+     */
     clone(name?: string): ArrayDefinition<T>;
 }
 
+/**
+ * Mutable array type definition with chainable configuration
+ * @template T - Element type of the array
+ * @remarks 
+ * - Represents fixed-length arrays of specified element type
+ * - Supports chainable configuration before freezing
+ */
 export interface ArrayDefinition<T> extends ArrayDefinitionFreezed<T> {
+    /**
+     * Sets array type name
+     * @param name - New name for the array type
+     * @returns Current instance for chaining
+     */
     setName(name?: string): ArrayDefinition<T>;
+    /**
+     * Sets fixed byte size for the entire array
+     * @param size - Total byte size override
+     * @returns Current instance for chaining
+     * @remarks 
+     * - Overrides calculated size (element size × length)
+     * - Use with caution - incorrect size may cause data corruption
+     */
     setSize(size?: number): ArrayDefinition<T>;
+    /**
+     * Sets memory alignment requirement
+     * @param align - Alignment requirement
+     * @returns Current instance for chaining
+     * @remarks 
+     * - Defaults to element's alignment
+     */
     setAlign(align?: number): ArrayDefinition<T>;
+    /**
+     * Changes element type
+     * @template M - New element type
+     * @param type - New element type definition
+     * @returns Current array definition with updated element type
+     */
     setElement<M>(type?: TypeDefinition<M>): ArrayDefinition<M>;
+    /**
+     * Changes array length
+     * @param length - New element count
+     * @returns Current instance for chaining
+     */
     setLength(length?: number): ArrayDefinition<T>;
+    /**
+     * Freezes the type definition to prevent modification
+     * @returns Immutable version of the type definition
+     * @remarks 
+     * - Improves performance by preventing runtime changes
+     * - Should be called after final configuration
+     * @example 
+     * const finalType = mutableType.freeze();
+     */
     freeze(): ArrayDefinitionFreezed<T>;
 }
 
+/**
+ * Creates configurable array type definition
+ * @overload
+ * @param name - Array type name
+ * @returns Empty array definition (unknown element type, length=0)
+ */
 export function defineArray(name?: string): ArrayDefinition<unknown>;
+/**
+ * Creates configurable array type definition
+ * @overload
+ * @param element - Element type definition
+ * @param length - Array element count
+ * @param name - Optional array type name
+ * @returns Configured array definition
+ * @template T - Element type
+ * @example 
+ */
 export function defineArray<T>(element: TypeDefinition<T>, length?: number, name?: string): ArrayDefinition<T>;
+/**
+ * Array definition implementation
+ * @param param0 - Element type or name
+ * @param length - Array length
+ * @param name - Array name
+ * @returns Array definition instance
+ */
 export function defineArray<T>(param0?: TypeDefinition<T> | string, length?: number, name?: string): ArrayDefinition<T> {
     let _name: string | undefined;
     let _size: number | undefined;
