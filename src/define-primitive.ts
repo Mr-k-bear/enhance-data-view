@@ -1,21 +1,103 @@
 import { TypeDefinitionSymbol } from "./core";
 import type { TypeDefinition, OperationGetter, OperationSetter, OperationReactive } from "./core";
 
+/**
+ * Immutable primitive type definition (frozen state)
+ * @template T - JavaScript type represented by this primitive
+ */
 export interface PrimitiveDefinitionFreezed<T> extends TypeDefinition<T> {
+    /**
+     * Creates a mutable clone of the type definition
+     * @param name - Optional new name for the cloned definition
+     * @returns New mutable primitive type definition
+     * @example 
+     * const cloned = frozenType.clone('MyRenamedType');
+     */
     clone(name?: string): PrimitiveDefinition<T>;
 }
 
+/**
+ * Mutable primitive type definition with chainable configuration
+ * @template T - JavaScript type represented by this primitive
+ * @remarks Use chainable methods to configure properties before freezing
+ */
 export interface PrimitiveDefinition<T> extends PrimitiveDefinitionFreezed<T> {
+    /**
+     * Sets the type name (for debugging/identification)
+     * @param name - New name for the type
+     * @returns Current instance for chaining
+     * @example 
+     * .setName('ColorRGBA')
+     */
     setName(name?: string): PrimitiveDefinition<T>;
+    /**
+     * Sets the byte size of the type
+     * @param size - Size in bytes (default: 0)
+     * @returns Current instance for chaining
+     * @example 
+     * .setSize(4)
+     */
     setSize(size?: number): PrimitiveDefinition<T>;
+    /**
+     * Sets the memory alignment requirement
+     * @param align - Alignment value (default: 1)
+     * @returns Current instance for chaining
+     * @example 
+     * .setAlign(4) // DWORD alignment
+     */
     setAlign(align?: number): PrimitiveDefinition<T>;
+    /**
+     * Sets the read operation implementation
+     * @param getter - Read function (default: throws error)
+     * @returns Current instance for chaining
+     * @example 
+     * .setGetter(ctx => ctx.view.getUint32(ctx.offset))
+     */
     setGetter(getter?: OperationGetter<T>): PrimitiveDefinition<T>;
+    /**
+     * Sets the write operation implementation
+     * @param setter - Write function (default: throws error)
+     * @returns Current instance for chaining
+     * @example 
+     * .setSetter((ctx, value) => ctx.view.setUint32(ctx.offset, value))
+     */
     setSetter(setter?: OperationSetter<T>): PrimitiveDefinition<T>;
+    /**
+     * Sets the reactive conversion implementation
+     * @param reactive - Reactive converter (default: basic getter-based)
+     * @returns Current instance for chaining
+     * @example 
+     * .setReactive(ctx => createReactiveProxy(...))
+     */
     setReactive(reactive?: OperationReactive<T>): PrimitiveDefinition<T>;
+    /**
+     * Freezes the type definition to prevent modification
+     * @returns Immutable version of the type definition
+     * @remarks 
+     * - Improves performance by preventing runtime changes
+     * - Should be called after final configuration
+     * @example 
+     * const finalType = mutableType.freeze();
+     */
     freeze(): PrimitiveDefinitionFreezed<T>;
 }
 
+/**
+ * Creates a configurable primitive type definition
+ * @param name - Initial type name (optional)
+ * @returns Mutable primitive type definition
+ * @remarks 
+ * - Start with this to define custom binary types
+ * - Chain configuration methods before freezing
+ * @example 
+ * const Float32 = definePrimitive<number>('float32')
+ *   .setSize(4)
+ *   .setGetter(ctx => ctx.view.getFloat32(ctx.offset, ctx.littleEndian))
+ *   .setSetter((ctx, value) => ctx.view.setFloat32(ctx.offset, value, ctx.littleEndian))
+ *   .freeze();
+ */
 export function definePrimitive<T>(name?: string): PrimitiveDefinition<T> {
+    // Configuration state
     let _name: string | undefined = name;
     let _size: number | undefined;
     let _align: number | undefined;
@@ -65,12 +147,14 @@ export function definePrimitive<T>(name?: string): PrimitiveDefinition<T> {
         .setGetter(_getter)
         .setSetter(_setter)
         .setReactive(_reactive);
+    // Default operations (throw if not configured)
     const getter: OperationGetter<T> = () => {
-        throw new Error();
+        throw new Error(`Getter not implemented for type '${_name || "unknown"}'`);
     };
     const setter: OperationSetter<T> = () => {
-        throw new Error();
+        throw new Error(`Setter not implemented for type '${_name || "unknown"}'`);
     };
+    // Default reactive implementation
     const reactive: OperationReactive<T> = ({ view, littleEndian, localOffset, baseOffset, cacheGetter }) => {
         const getter = () => typeDefinition.getter({
             view,
@@ -80,6 +164,7 @@ export function definePrimitive<T>(name?: string): PrimitiveDefinition<T> {
         cacheGetter(getter);
         return getter()
     };
+    // Main definition object with getters
     const typeDefinition: PrimitiveDefinition<T> = {
         isTypeDefinition: TypeDefinitionSymbol,
         get name() {

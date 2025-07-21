@@ -13,3 +13,5 @@ type I = TypeDefinedInfer<typeof Q>;
 test("hello", () => {
     expect(Q.size).toBe(28);
 });
+
+btoa

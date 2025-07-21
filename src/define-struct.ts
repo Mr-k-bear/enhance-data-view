@@ -2,20 +2,52 @@ import { TypeDefinitionSymbol, OperationRawSymbol, isTypeDefinition } from "./co
 import type { OperationGetter, OperationSetter, OperationReactive } from "./core";
 import type { TypeDefinition, OperationContextDynamic } from "./core";
 
+/**
+ * Utility type to force TypeScript to simplify complex types
+ * @template T - Type to flatten
+ */
 export type Flatten<T> = {} & { [K in keyof T]: T[K] };
 
+/** Valid key types for struct properties */
 export type StructKey = string | symbol;
 
+/** Unique symbol identifying property definitions */
 export const PropertyDefinitionSymbol = Symbol("PROPERTY_DEFINITION");
 
+/**
+ * Defines a struct property configuration
+ * @template T - JavaScript type of the property
+ */
 export interface PropertyDefinition<T> {
+    /** Property identification marker */
     isPropertyDefinition: typeof PropertyDefinitionSymbol;
+    /** Type definition for the property */
     type: TypeDefinition<T>;
+    /** 
+     * Custom alignment override 
+     * @remarks Takes precedence over the type's natural alignment
+     */
     align?: number;
+    /** 
+     * Fixed byte offset override
+     * @remarks Bypasses automatic layout calculation
+     */
     offset?: number;
+    /** 
+     * Explicit ordering index
+     * @remarks Determines position in struct layout when set
+     */
     order?: number;
 }
 
+/**
+ * Creates a property definition
+ * @param type - Property type definition
+ * @param options - Configuration options
+ * @returns Property definition object
+ * @example 
+ * defineProperty(Uint32, { align: 8, offset: 0x10 })
+ */
 export function defineProperty<T>(type: TypeDefinition<T>, options?: { align?: number, offset?: number, order?: number }): PropertyDefinition<T> {
     return {
         isPropertyDefinition: PropertyDefinitionSymbol,
@@ -26,6 +58,7 @@ export function defineProperty<T>(type: TypeDefinition<T>, options?: { align?: n
     }
 }
 
+/** Type guard for property definitions */
 export function isPropertyDefinition(test: any): test is PropertyDefinition<any> {
     if (typeof test !== "object" || test === null) {
         return false;
@@ -36,16 +69,41 @@ export function isPropertyDefinition(test: any): test is PropertyDefinition<any>
     return false;
 }
 
+/** Unique symbol identifying padding definitions */
 export const PaddingDefinitionSymbol = Symbol("STRUCT_DEFINITION");
 
+/**
+ * Defines padding within a struct
+ * @template T - Padding symbol type (internal)
+ */
 export interface PaddingDefinition<T extends typeof PaddingDefinitionSymbol = typeof PaddingDefinitionSymbol> {
+    /** Padding identification marker */
     isPaddingDefinition: T;
+    /** Padding size in bytes */
     size: number;
+    /** Padding alignment requirement */
     align: number;
+    /** 
+     * Fixed byte offset override
+     * @remarks Bypasses automatic layout calculation
+     */
     offset?: number;
+    /** 
+     * Explicit ordering index
+     * @remarks Determines position in struct layout when set
+     */
     order?: number;
 }
 
+/**
+ * Creates a padding definition
+ * @param typeOrSize - Type definition or byte size
+ * @param options - Configuration options
+ * @returns Padding definition object
+ * @example 
+ * // 8-byte padding with 4-byte alignment
+ * definePadding(8, { align: 4 })
+ */
 export function definePadding(typeOrSize: TypeDefinition<any> | number, options?: { align?: number, offset?: number, order?: number }): PaddingDefinition {
     return typeof typeOrSize === "number" ? {
         isPaddingDefinition: PaddingDefinitionSymbol,
@@ -62,6 +120,7 @@ export function definePadding(typeOrSize: TypeDefinition<any> | number, options?
     };
 }
 
+/** Type guard for padding definitions */
 export function isPaddingDefinition(test: any): test is PaddingDefinition {
     if (typeof test !== "object" || test === null) {
         return false;
@@ -72,53 +131,187 @@ export function isPaddingDefinition(test: any): test is PaddingDefinition {
     return false;
 }
 
+/**
+ * Configuration object for struct properties
+ * @template T - Struct shape mapping keys to types
+ */
 export type StructDefinitionOptions<T extends Record<StructKey, any | never>> = {
     [K in keyof T]: PropertyDefinition<T[K]> | PaddingDefinition<T[K]> | TypeDefinition<T[K]>;
 };
 
+/**
+ * Maps padding definitions to void in struct types
+ * @template T - Original struct type mapping
+ */
 export type MapPaddingDefinition<T extends Record<StructKey, any>> = { [K in keyof T]: T[K] extends typeof PaddingDefinitionSymbol ? void : T[K] };
 
+/** Calculated property layout information */
 export interface PropertyRecord {
+    /** Property key */
     key: StructKey;
+    /** Property type definition */
     type: TypeDefinition<any>;
+    /** Effective alignment */
     align?: number;
+    /** Calculated byte offset */
     offset: number;
+    /** Original static offset if provided */
     offsetStatic?: number;
+    /** Padding marker (false for properties) */
     padding?: false;
 }
 
+/** Calculated padding layout information */
 export interface PaddingRecord {
+    /** Padding identifier key */
     key: StructKey;
+    /** Padding size in bytes */
     size: number;
+    /** Effective alignment */
     align: number;
+    /** Calculated byte offset */
     offset: number;
+    /** Original static offset if provided */
     offsetStatic?: number;
+    /** Padding marker (true) */
     padding: true;
 }
 
+/**
+ * Immutable struct type definition (frozen state)
+ * @template T - Struct shape
+ */
 export interface StructDefinitionFreezed<T extends Record<StructKey, any>> extends TypeDefinition<T> {
+    /** Array of property keys (excluding padding) */
     keys: ReadonlyArray<StructKey>;
+    /** Map of property records (excluding padding) */
     properties: ReadonlyMap<StructKey, PropertyRecord>;
+    /** Array of property records (excluding padding) */
     propertyList: ReadonlyArray<PropertyRecord>;
+    /** Complete layout records (properties + padding) */
     recordList: ReadonlyArray<PropertyRecord | PaddingRecord>;
+    /**
+     * Creates a mutable clone
+     * @param name - Optional new name for cloned definition
+     * @returns Mutable struct definition
+     */
     clone(name?: string): StructDefinition<T>;
 }
 
+/**
+ * Mutable struct type definition with chainable API
+ * @template T - Struct shape
+ * @remarks 
+ * - Supports dynamic property management
+ * - Performs automatic memory layout calculation
+ */
 export interface StructDefinition<T extends Record<StructKey, any>> extends StructDefinitionFreezed<T> {
+    /**
+     * Sets struct name
+     * @param name - New struct name
+     * @returns Current instance for chaining
+     */
     setName(name?: string): StructDefinition<T>;
+    /**
+     * Sets fixed struct size
+     * @param size - Byte size override
+     * @returns Current instance for chaining
+     * @remarks Bypasses automatic size calculation
+     */
     setSize(size?: number): StructDefinition<T>;
+    /**
+     * Sets struct alignment
+     * @param align - Alignment requirement
+     * @returns Current instance for chaining
+     * @remarks Overrides automatic alignment detection
+     */
     setAlign(align?: number): StructDefinition<T>;
+    /**
+     * Replaces all properties
+     * @param options - New property configuration
+     * @returns Current struct definition with updated type
+     * @template M - New struct shape
+     */
     setProperties<M extends Record<StructKey, any>>(options: StructDefinitionOptions<M>): StructDefinition<Flatten<MapPaddingDefinition<M>>>;
+    /**
+     * Adds new property
+     * @param key - Property key (must not exist)
+     * @param type - Property type definition
+     * @param options - Configuration options
+     * @returns Current struct definition with extended type
+     * @template K - New property key
+     * @template V - New property value type
+     */
     addProperty<K extends StructKey, V>(key: K extends keyof T ? never : K, type: TypeDefinition<V>, options?: { align?: number, offset?: number }): StructDefinition<Flatten<T & { [X in K]: V }>>;
+    /**
+     * Adds padding region
+     * @param key - Padding identifier key (must not exist)
+     * @param typeOrSize - Type definition or byte size
+     * @param options - Configuration options
+     * @returns Current struct definition with extended type
+     * @template K - New padding key
+     */
     addPadding<K extends StructKey>(key: K extends keyof T ? never : K, typeOrSize: TypeDefinition<any> | number, options?: { align?: number, offset?: number }): StructDefinition<Flatten<T & { [X in K]: void }>>;
+    /**
+     * Updates existing property
+     * @param key - Existing property key
+     * @param type - New type definition
+     * @param options - Configuration options
+     * @returns Current struct definition with updated type
+     * @template K - Property key to update
+     * @template V - New property type
+     */
     updateProperty<K extends keyof T, V>(key: K, type: TypeDefinition<V>, options?: { align?: number, offset?: number }): StructDefinition<Flatten<Omit<T, K> & { [P in K]: V }>>;
+    /**
+     * Updates existing padding
+     * @param key - Existing property key
+     * @param typeOrSize - Type definition or byte size
+     * @param options - Configuration options
+     * @returns Current struct definition with updated type
+     * @template K - Property key to update
+     */
     updatePadding<K extends keyof T>(key: K, typeOrSize: TypeDefinition<any> | number, options?: { align?: number, offset?: number }): StructDefinition<Flatten<Omit<T, K> & { [P in K]: void }>>;
+    /**
+     * Removes property/padding
+     * @param key - Key to remove
+     * @returns New struct definition with reduced type
+     * @template K - Key to remove
+     */
     remove<K extends keyof T>(key: K): StructDefinition<Flatten<Omit<T, K>>>;
+    /**
+     * Freezes the type definition to prevent modification
+     * @returns Immutable version of the type definition
+     * @remarks 
+     * - Improves performance by preventing runtime changes
+     * - Should be called after final configuration
+     * @example 
+     * const finalType = mutableType.freeze();
+     */
     freeze(): StructDefinitionFreezed<T>;
 }
 
+/**
+ * Creates a configurable struct type definition
+ * @overload
+ * @param name - Struct name
+ * @returns Empty struct definition
+ */
 export function defineStruct(name?: string): StructDefinition<{}>;
+/**
+ * Creates a configurable struct type definition
+ * @overload
+ * @param options - Initial property configuration
+ * @param name - Optional struct name
+ * @returns Configured struct definition
+ * @template T - Initial struct shape
+ */
 export function defineStruct<T extends Record<StructKey, any>>(options: StructDefinitionOptions<T>, name?: string): StructDefinition<Flatten<MapPaddingDefinition<T>>>;
+/**
+ * Struct definition implementation
+ * @param param0 - Options object or name
+ * @param param1 - Optional name
+ * @returns Struct definition instance
+ */
 export function defineStruct<T extends Record<StructKey, any> = {}>(param0?: StructDefinitionOptions<T> | string, param1?: string): StructDefinition<Flatten<MapPaddingDefinition<T>>> {
     let _name: string | undefined;
     let _size: number | undefined;
