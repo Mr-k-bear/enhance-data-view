@@ -430,7 +430,7 @@ export function defineStruct<T extends Record<StructKey, any> = {}>(param0?: Str
                 property = paddingToRecord(key, option);
             }
             else {
-                throw new Error();
+                throw new Error(`[${typeDefinition.name}] Unknown option type.`);
             }
             if (typeof option.order === "number") {
                 orderList.push({
@@ -471,7 +471,8 @@ export function defineStruct<T extends Record<StructKey, any> = {}>(param0?: Str
     const addRecord = (property: PropertyRecord | PaddingRecord): StructDefinition<T> => {
         // Duplicate Check
         if (_recordList.find(x => x.key === property.key)) {
-            throw new Error();
+            const keyString = typeof property.key === "symbol" ? `Symbol(${property.key.description || ""})` : property.key;
+            throw new Error(`[${typeDefinition.name}] Repeat adding records with key: ${keyString}`);
         }
         // Update
         _recordList.push(property);
@@ -486,7 +487,8 @@ export function defineStruct<T extends Record<StructKey, any> = {}>(param0?: Str
     const updateRecord = (property: PropertyRecord | PaddingRecord): StructDefinition<T> => {
         const index = _recordList.findIndex(x => x.key === property.key);
         if (index < 0) {
-            throw new Error();
+            const keyString = typeof property.key === "symbol" ? `Symbol(${property.key.description || ""})` : property.key;
+            throw new Error(`[${typeDefinition.name}] There is no record with key: ${keyString}`);
         }
         // Update
         _recordList.splice(index, 1, property);
@@ -501,7 +503,8 @@ export function defineStruct<T extends Record<StructKey, any> = {}>(param0?: Str
     const remove: StructDefinition<T>["remove"] = (key) => {
         const index = _recordList.findIndex(x => x.key === key);
         if (index < 0) {
-            throw new Error();
+            const keyString = typeof key === "symbol" ? `Symbol(${key.description || ""})` : key as string;
+            throw new Error(`[${typeDefinition.name}] There is no record with key: ${keyString}`);
         }
         // Delete
         _recordList.splice(index, 1);
@@ -524,10 +527,9 @@ export function defineStruct<T extends Record<StructKey, any> = {}>(param0?: Str
             clone: newDefinition.clone
         });
     };
-    const clone: StructDefinition<T>["clone"] = (name) => defineStruct(name ?? _name)
+    const clone: StructDefinition<T>["clone"] = (name) => defineStruct(getProperties(), name ?? _name)
         .setSize(_size)
-        .setAlign(_align)
-        .setProperties(getProperties()) as any;
+        .setAlign(_align) as any;
     const getter: OperationGetter<T> = ({ view, offset, littleEndian }) => {
         const structure: Record<StructKey, any> = {};
         for (const property of _propertyList) {
@@ -549,13 +551,13 @@ export function defineStruct<T extends Record<StructKey, any> = {}>(param0?: Str
         }
     };
     const reactive: OperationReactive<T> = ({ view, littleEndian, localOffset, baseOffset, cacheGetter }) => {
-        const toRaw = () => typeDefinition.getter({
+        const proxyToRaw = () => typeDefinition.getter({
             view,
             offset: baseOffset() + localOffset,
             littleEndian
         });
         const internal = new Map<string | symbol, any>([
-            [OperationRawSymbol, toRaw]
+            [OperationRawSymbol, proxyToRaw]
         ]);
         // Prop getter
         const getterMap = new Map<StructKey, () => any>();
