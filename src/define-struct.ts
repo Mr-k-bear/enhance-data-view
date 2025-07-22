@@ -139,12 +139,6 @@ export type StructDefinitionOptions<T extends Record<StructKey, any | never>> = 
     [K in keyof T]: PropertyDefinition<T[K]> | PaddingDefinition<T[K]> | TypeDefinition<T[K]>;
 };
 
-/**
- * Maps padding definitions to void in struct types
- * @template T - Original struct type mapping
- */
-export type MapPaddingDefinition<T extends Record<StructKey, any>> = { [K in keyof T]: T[K] extends typeof PaddingDefinitionSymbol ? void : T[K] };
-
 /** Calculated property layout information */
 export interface PropertyRecord {
     /** Property key */
@@ -177,11 +171,13 @@ export interface PaddingRecord {
     padding: true;
 }
 
+export type KeysWithPaddingDefinition<T> = { [K in keyof T]: T[K] extends typeof PaddingDefinitionSymbol ? K : never }[keyof T];
+
 /**
  * Immutable struct type definition (frozen state)
  * @template T - Struct shape
  */
-export interface StructDefinitionFreezed<T extends Record<StructKey, any>> extends TypeDefinition<T> {
+export interface StructDefinitionFreezed<T extends Record<StructKey, any>> extends TypeDefinition<Flatten<Omit<T, KeysWithPaddingDefinition<T>>>> {
     /** Array of property keys (excluding padding) */
     keys: ReadonlyArray<StructKey>;
     /** Map of property records (excluding padding) */
@@ -232,7 +228,7 @@ export interface StructDefinition<T extends Record<StructKey, any>> extends Stru
      * @returns Current struct definition with updated type
      * @template M - New struct shape
      */
-    setProperties<M extends Record<StructKey, any>>(options: StructDefinitionOptions<M>): StructDefinition<Flatten<MapPaddingDefinition<M>>>;
+    setProperties<M extends Record<StructKey, any>>(options: StructDefinitionOptions<M>): StructDefinition<M>;
     /**
      * Adds new property
      * @param key - Property key (must not exist)
@@ -251,7 +247,7 @@ export interface StructDefinition<T extends Record<StructKey, any>> extends Stru
      * @returns Current struct definition with extended type
      * @template K - New padding key
      */
-    addPadding<K extends StructKey>(key: K extends keyof T ? never : K, typeOrSize: TypeDefinition<any> | number, options?: { align?: number, offset?: number }): StructDefinition<Flatten<T & { [X in K]: void }>>;
+    addPadding<K extends StructKey>(key: K extends keyof T ? never : K, typeOrSize: TypeDefinition<any> | number, options?: { align?: number, offset?: number }): StructDefinition<Flatten<T & { [X in K]: typeof PaddingDefinitionSymbol }>>;
     /**
      * Updates existing property
      * @param key - Existing property key
@@ -280,7 +276,7 @@ export interface StructDefinition<T extends Record<StructKey, any>> extends Stru
      * - Padding keys become void in type system
      * @template K - Property key to update
      */
-    updatePadding<K extends keyof T>(key: K, typeOrSize: TypeDefinition<any> | number, options?: { align?: number, offset?: number }): StructDefinition<Flatten<Omit<T, K> & { [P in K]: void }>>;
+    updatePadding<K extends keyof T>(key: K, typeOrSize: TypeDefinition<any> | number, options?: { align?: number, offset?: number }): StructDefinition<Flatten<Omit<T, K> & { [P in K]: typeof PaddingDefinitionSymbol }>>;
     /**
      * Removes property/padding
      * @param key - Key to remove
@@ -315,14 +311,14 @@ export function defineStruct(name?: string): StructDefinition<{}>;
  * @returns Configured struct definition
  * @template T - Initial struct shape
  */
-export function defineStruct<T extends Record<StructKey, any>>(options: StructDefinitionOptions<T>, name?: string): StructDefinition<Flatten<MapPaddingDefinition<T>>>;
+export function defineStruct<T extends Record<StructKey, any>>(options: StructDefinitionOptions<T>, name?: string): StructDefinition<T>;
 /**
  * Struct definition implementation
  * @param param0 - Options object or name
  * @param param1 - Optional name
  * @returns Struct definition instance
  */
-export function defineStruct<T extends Record<StructKey, any> = {}>(param0?: StructDefinitionOptions<T> | string, param1?: string): StructDefinition<Flatten<MapPaddingDefinition<T>>> {
+export function defineStruct<T extends Record<StructKey, any> = {}>(param0?: StructDefinitionOptions<T> | string, param1?: string): StructDefinition<T> {
     let _name: string | undefined;
     let _size: number | undefined;
     let _sizeCalc: number = 0;
@@ -530,7 +526,7 @@ export function defineStruct<T extends Record<StructKey, any> = {}>(param0?: Str
     const clone: StructDefinition<T>["clone"] = (name) => defineStruct(getProperties(), name ?? _name)
         .setSize(_size)
         .setAlign(_align) as any;
-    const getter: OperationGetter<T> = ({ view, offset, littleEndian }) => {
+    const getter: OperationGetter<any> = ({ view, offset, littleEndian }) => {
         const structure: Record<StructKey, any> = {};
         for (const property of _propertyList) {
             structure[property.key] = property.type.getter({
@@ -541,7 +537,7 @@ export function defineStruct<T extends Record<StructKey, any> = {}>(param0?: Str
         }
         return structure as T;
     };
-    const setter: OperationSetter<T> = ({ view, offset, littleEndian }, value) => {
+    const setter: OperationSetter<any> = ({ view, offset, littleEndian }, value) => {
         for (const property of _propertyList) {
             property.type.setter({
                 view,
@@ -550,7 +546,7 @@ export function defineStruct<T extends Record<StructKey, any> = {}>(param0?: Str
             }, value[property.key]);
         }
     };
-    const reactive: OperationReactive<T> = ({ view, littleEndian, localOffset, baseOffset, cacheGetter }) => {
+    const reactive: OperationReactive<any> = ({ view, littleEndian, localOffset, baseOffset, cacheGetter }) => {
         const proxyToRaw = () => typeDefinition.getter({
             view,
             offset: baseOffset() + localOffset,
