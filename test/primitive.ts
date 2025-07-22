@@ -1,4 +1,4 @@
-import { TYPES, get, set, getArray, setArray } from "enhance-data-view";
+import { types, get, set, getArray, setArray } from "enhance-data-view";
 
 describe("Primitive types read/write operations", () => {
     const testCases: Array<[
@@ -7,18 +7,18 @@ describe("Primitive types read/write operations", () => {
         number | bigint | string,
         number
     ]> = [
-            ["INT_8", TYPES.INT_8, -42, 1],
-            ["INT_16", TYPES.INT_16, -2048, 2],
-            ["INT_32", TYPES.INT_32, -100000, 4],
-            ["INT_64", TYPES.INT_64, -123456789012345n, 8],
-            ["UINT_8", TYPES.UINT_8, 200, 1],
-            ["UINT_16", TYPES.UINT_16, 45000, 2],
-            ["UINT_32", TYPES.UINT_32, 3000000000, 4],
-            ["UINT_64", TYPES.UINT_64, 123456789012345n, 8],
-            ["CHAR", TYPES.CHAR, "A", 1],
-            ["FLOAT_16", TYPES.FLOAT_16, 3.14, 2],
-            ["FLOAT_32", TYPES.FLOAT_32, 123.456, 4],
-            ["FLOAT_64", TYPES.FLOAT_64, 123456.789012, 8],
+            ["INT_8", types.INT_8, -42, 1],
+            ["INT_16", types.INT_16, -2048, 2],
+            ["INT_32", types.INT_32, -100000, 4],
+            ["INT_64", types.INT_64, -123456789012345n, 8],
+            ["UINT_8", types.UINT_8, 200, 1],
+            ["UINT_16", types.UINT_16, 45000, 2],
+            ["UINT_32", types.UINT_32, 3000000000, 4],
+            ["UINT_64", types.UINT_64, 123456789012345n, 8],
+            ["CHAR", types.CHAR, "A", 1],
+            ["FLOAT_16", types.FLOAT_16, 3.14, 2],
+            ["FLOAT_32", types.FLOAT_32, 123.456, 4],
+            ["FLOAT_64", types.FLOAT_64, 123456.789012, 8],
         ];
 
     describe.each(testCases)(
@@ -72,10 +72,10 @@ describe("Array types read/write operations", () => {
         number,
         number
     ]> = [
-            ["INT_8 array", TYPES.INT_8, [-1, 0, 1, 127, -128], 1, 5],
-            ["UINT_16 array", TYPES.UINT_16, [100, 200, 300, 400], 2, 4],
-            ["FLOAT_32 array", TYPES.FLOAT_32, [1.1, 2.2, 3.3, 4.4], 4, 4],
-            ["CHAR array", TYPES.CHAR, ["A", "B", "C", "D"], 1, 4],
+            ["INT_8 array", types.INT_8, [-1, 0, 1, 127, -128], 1, 5],
+            ["UINT_16 array", types.UINT_16, [100, 200, 300, 400], 2, 4],
+            ["FLOAT_32 array", types.FLOAT_32, [1.1, 2.2, 3.3, 4.4], 4, 4],
+            ["CHAR array", types.CHAR, ["A", "B", "C", "D"], 1, 4],
         ];
 
     describe.each(arrayTestCases)(
@@ -102,8 +102,8 @@ describe("Array types read/write operations", () => {
         const buffer = new ArrayBuffer(length * 4);
         const view = new DataView(buffer);
         const testArray = Array.from({ length }, (_, i) => i * 10);
-        setArray(view, TYPES.INT_32, 0, testArray, true);
-        const result = getArray(view, TYPES.INT_32, 0, length, true);
+        setArray(view, types.INT_32, 0, testArray, true);
+        const result = getArray(view, types.INT_32, 0, length, true);
         expect(result.length).toBe(length);
         expect(result).toEqual(testArray);
     });
