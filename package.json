@@ -1,17 +1,49 @@
 {
     "name": "enhance-data-view",
     "version": "1.0.0",
-    "description": "Enhance DataView tools.",
-    "main": "index.js",
+    "description": "Reactive DataView extension with chainable API for type-safe binary data manipulation.",
     "type": "module",
+    "main": "./dist/index.esm.js",
+    "module": "./dist/index.esm.js",
+    "types": "./dist/types/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/types/index.d.ts",
+            "import": "./dist/index.esm.js",
+            "require": "./dist/index.cjs.js"
+        }
+    },
+    "keywords": [
+        "dataview",
+        "arraybuffer",
+        "webassembly",
+        "wasm",
+        "binary",
+        "struct",
+        "reactive",
+        "proxy",
+        "memory-layout",
+        "typescript",
+        "memory",
+        "buffer",
+        "typedarray"
+    ],
+    "author": "MrKBear <mrkbear@qq.com>",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/Mr-k-bear/enhance-data-view.git"
+    },
+    "homepage": "https://github.com/Mr-k-bear/enhance-data-view",
+    "bugs": "https://github.com/Mr-k-bear/enhance-data-view/issues",
+    "files": [
+        "dist"
+    ],
     "scripts": {
         "build": "rollup -c",
         "type": "tsc --noEmit",
         "test": "jest"
     },
-    "keywords": [],
-    "author": "MrKBear <mrkbear@qq.com>",
-    "license": "ISC",
     "devDependencies": {
         "@rollup/plugin-terser": "^0.4.4",
         "@rollup/plugin-typescript": "^12.1.4",
