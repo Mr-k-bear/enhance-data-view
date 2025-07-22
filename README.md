@@ -79,7 +79,7 @@ import { UINT_8, FLOAT_32 } from "enhance-data-view";
 
 ### Struct Types
 
-Create structs through the defineStruct function:
+Create structs through the `defineStruct` function:
 
 ```typescript
 import { defineStruct, types } from "enhance-data-view";
@@ -99,7 +99,7 @@ const MyStruct = defineStruct({
 
 We recommend the chained declaration syntax, as it is more flexible and secure.
 
-### 数组类型
+### Array Types
 
 Define array types through the `defineArray` function:
 
@@ -129,9 +129,9 @@ const MyString = defineString(10, 0).freeze();
 
 ### Reactive Read/Write
 
-The core capability of EDataView is providing reactive data access to ArrayBuffer. Through the powerful reactive/ref functions, you can map any data type in DataView to a JavaScript Proxy object.
+The core capability of EDataView is providing reactive data access to `ArrayBuffer`. Through the powerful `reactive`/`ref` functions, you can map any data type in DataView to a JavaScript Proxy object.
 
-All operations on the Proxy object will be reactively synchronized to the original ArrayBuffer. This feature is particularly suitable for handling dynamic data in WebAssembly (WASM) memory.
+All operations on the Proxy object will be reactively synchronized to the original `ArrayBuffer`. This feature is particularly suitable for handling dynamic data in WebAssembly (WASM) memory.
 
 ```typescript
 import { defineStruct, reactive, types } from "enhance-data-view";
@@ -151,7 +151,9 @@ data.bar = 1;
 console.log(data.bar);
 ```
 
-When handling primitive value types (such as number/boolean), using reactive directly will fail because JavaScript's proxy mechanism cannot intercept direct assignment operations on primitive values. In this case, the ref function must be used.
+When handling primitive value types (such as number/boolean), using reactive directly will fail because JavaScript's proxy mechanism cannot intercept direct assignment operations on primitive values. 
+
+In this case, the ref function must be used.
 
 ```typescript
 import { reactive, ref, types } from "enhance-data-view";
@@ -198,7 +200,7 @@ for (let i = 0; i < allData.length; i++) {
 }
 ```
 
-EDataView also provides the toRaw function for efficiently extracting raw data objects from reactive proxies, supporting full deep copy reads.
+EDataView also provides the `toRaw` function for efficiently extracting raw data objects from reactive proxies, supporting full deep copy reads.
 
 ```typescript
 import { defineArray, defineStruct, reactive, toRaw, types } from "enhance-data-view";
@@ -222,9 +224,9 @@ const bar = toRaw(data.bar);
 
 ### Comparison of Two Struct Declaration Methods
 
-Although the configuration object syntax is intuitive and clear, the enumeration order of JavaScript object properties may be inconsistent with the declaration order (underlying dependency on Object.entries order), while memory layout strictly depends on field order.
+Although the configuration object syntax is intuitive and clear, the enumeration order of JavaScript object properties may be inconsistent with the declaration order (underlying dependency on `Object.entries` order), while memory layout strictly depends on field order.
 
-To ensure order determinism, you can use defineProperty to explicitly specify the order parameter.
+To ensure order determinism, you can use `defineProperty` to explicitly specify the order parameter.
 
 ```typescript
 import { defineStruct, defineProperty, types } from "enhance-data-view";
@@ -239,7 +241,7 @@ const MyStruct = defineStruct({
 
 The struct memory layout is automatically calculated based on the alignment requirements (align) of property types. `defineStruct` automatically inserts padding bytes to meet the alignment requirements of all properties, similar to static language compilers.
 
-> If you try to print `MyStruct.size`, the result is not 5, but 8, because defineStruct automatically adds 3 bytes of padding after `UINT_8` to meet the alignment requirements of `FLOAT_32`
+> If you try to print `MyStruct.size`, the result is not 5, but 8, because `defineStruct` automatically adds 3 bytes of padding after `UINT_8` to meet the alignment requirements of `FLOAT_32`.
 
 Each type has a predefined alignment value, which can also be explicitly overridden using the align parameter to create a compact layout:
 
@@ -265,7 +267,7 @@ const MyCompactStruct = defineStruct({
 
 In some scenarios, you may only need to manipulate certain fields within a struct. In this case, you can use padding fields or manual layout to skip irrelevant data areas and achieve precise memory positioning.
 
-For example: accessing `foo` and `bar` from the 32-byte offset of the struct:
+For example: accessing `foo` and `bar` from the 32 byte offset of the struct:
 
 ```typescript
 import { defineStruct, defineProperty, definePadding, types } from "enhance-data-view";
@@ -289,9 +291,9 @@ const MyLayoutStruct = defineStruct({
 
 ### Struct Padding Properties
 
-If automatic layout cannot meet complex requirements, defineStruct supports manual layout mode: by directly specifying field offsets to precisely control memory layout, completely bypassing the automatic calculation mechanism.
+If automatic layout cannot meet complex requirements, `defineStruct` supports manual layout mode: by directly specifying field offsets to precisely control memory layout, completely bypassing the automatic calculation mechanism.
 
-Regardless of whether automatic or manual layout is used, defineStruct intelligently calculates the total size of the struct.
+Regardless of whether automatic or manual layout is used, `defineStruct` intelligently calculates the total size of the struct.
 
 > For example, `MyLayoutStruct.size` in the example will correctly return 40 bytes
 
@@ -313,7 +315,7 @@ const MyLayoutStruct = defineStruct({
 
 ### String Character Set
 
-By default, `defineString` uses the UTF-8 character set (based on TextEncoder/TextDecoder implementation).
+By default, `defineString` uses the UTF-8 character set (based on `TextEncoder`/`TextDecoder` implementation).
 
 If other character sets need to be supported, flexible extensions can be achieved through custom codecs.
 
