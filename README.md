@@ -2,6 +2,9 @@
 
 Enhanced DataView(EDataView) is a lightweight binary data manipulation library, rigorously written in TypeScript, providing a chained API for type definition and reactive data manipulation.
 
+[![EDataView on npm](https://img.shields.io/npm/v/enhance-data-view.svg)](https://www.npmjs.com/package/enhance-data-view)
+![MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+
 ## Core Features
 
 - **Declarative Type System:** Define complex data structures through a concise chained API, abstracting underlying binary operations
@@ -15,6 +18,16 @@ Enhanced DataView(EDataView) is a lightweight binary data manipulation library, 
 ```bash
 npm install enhanced-data-view
 ```
+
+Using EDataView from CDN (jsdelivr)
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/enhance-data-view/dist/index.umd.mini.js"></script>
+<script>
+const { defineArray, defineString, defineStruct, types, reactive, toRaw } = window.EDataView;
+</script>
+```
+
 ## Quick Start
 
 ```typescript
