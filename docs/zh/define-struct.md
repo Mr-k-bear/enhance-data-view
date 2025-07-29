@@ -1,3 +1,9 @@
+---
+title: 结构体类型
+createTime: 2025/07/29 02:34:40
+permalink: /zh/define-struct/
+---
+
 # 结构体类型
 
 通过 `defineStruct` 函数创建结构体:

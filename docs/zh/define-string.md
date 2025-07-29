@@ -1,3 +1,9 @@
+---
+title: 字符串类型
+createTime: 2025/07/29 02:35:00
+permalink: /zh/define-string/
+---
+
 # 字符串类型
 
 通过 `defineString` 函数定义字符串类型:

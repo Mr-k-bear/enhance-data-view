@@ -1,3 +1,9 @@
+---
+title: 基础类型
+createTime: 2025/07/29 02:34:20
+permalink: /zh/define-primitive/
+---
+
 # 基础类型
 
 EDataView 预定义了各种常见类型，支持按需引入或批量导入:

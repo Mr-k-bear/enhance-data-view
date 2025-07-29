@@ -1,3 +1,9 @@
+---
+title: 快速上手
+createTime: 2025/07/25 08:01:12
+permalink: /zh/quick-start/
+---
+
 # 快速上手
 
 我们将尝试使用 EDataView 编写一段二进制操作逻辑，来快速入门。
@@ -216,3 +222,5 @@ console.log(person.friends[1]); // 255
 console.log(toRaw(person)); // { id: 1, name: "MrKBear", friends: [2, 255, 4, 5] }
 console.log(toRaw(person.friends)); // [2, 255, 4, 5]
 ```
+
+@[demo vue](../demo/quick-start.vue)

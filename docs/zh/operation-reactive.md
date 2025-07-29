@@ -1,3 +1,9 @@
+---
+title: 响应式读写
+createTime: 2025/07/29 02:39:31
+permalink: /zh/operation-reactive/
+---
+
 # 响应式读写
 
 EDataView 的核心能力是提供 ArrayBuffer 的响应式数据访问。通过强大的 reactive/ref 函数，您可以将 DataView 中的任意数据类型映射为 JavaScript 的 Proxy 对象。

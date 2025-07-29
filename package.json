@@ -42,7 +42,9 @@
     "scripts": {
         "build": "rollup -c",
         "type": "tsc --noEmit",
-        "test": "jest"
+        "test": "jest",
+        "docs:dev": "vuepress dev docs",
+        "docs:build": "vuepress build docs"
     },
     "devDependencies": {
         "@rollup/plugin-terser": "^0.4.4",
@@ -50,9 +52,13 @@
         "@tsconfig/node-lts": "^22.0.2",
         "@types/jest": "^30.0.0",
         "@types/node": "^24.1.0",
+        "@vuepress/bundler-vite": "2.0.0-rc.24",
         "jest": "^30.0.5",
         "rollup": "^4.45.1",
         "ts-jest": "^29.4.0",
-        "typescript": "^5.8.3"
+        "typescript": "^5.8.3",
+        "vue": "^3.5.18",
+        "vuepress": "2.0.0-rc.24",
+        "vuepress-theme-plume": "1.0.0-rc.159"
     }
 }

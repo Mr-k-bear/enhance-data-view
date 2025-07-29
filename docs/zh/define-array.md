@@ -1,3 +1,9 @@
+---
+title: 数组类型
+createTime: 2025/07/29 02:34:49
+permalink: /zh/define-array/
+---
+
 # 数组类型
 
 通过 `defineArray` 函数定义数组类型:
