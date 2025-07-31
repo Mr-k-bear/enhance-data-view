@@ -187,6 +187,19 @@ export interface StructDefinitionFreezed<T extends Record<StructKey, any>> exten
     /** Complete layout records (properties + padding) */
     recordList: ReadonlyArray<PropertyRecord | PaddingRecord>;
     /**
+     * Get the relative offset of property
+     * @param key - Property key
+     * @param baseOffset - A Base offset add to property offset
+     * @returns Relative offset
+     */
+    offsetOf(key: Exclude<keyof T, KeysWithPaddingDefinition<T>>, baseOffset?: number): number;
+    /**
+     * Get the byte size of property
+     * @param key - Property key
+     * @returns Byte size
+     */
+    sizeOf(key: Exclude<keyof T, KeysWithPaddingDefinition<T>>): number;
+    /**
      * Creates a mutable clone
      * @param name - Optional new name for cloned definition
      * @returns Mutable struct definition
@@ -517,6 +530,8 @@ export function defineStruct<T extends Record<StructKey, any> = {}>(param0?: Str
             properties: Object.freeze(newDefinition.properties),
             propertyList: Object.freeze(newDefinition.propertyList),
             recordList: Object.freeze(newDefinition.recordList),
+            offsetOf: newDefinition.offsetOf,
+            sizeOf: newDefinition.sizeOf,
             getter: newDefinition.getter,
             setter: newDefinition.setter,
             reactive: newDefinition.reactive,
@@ -526,6 +541,25 @@ export function defineStruct<T extends Record<StructKey, any> = {}>(param0?: Str
     const clone: StructDefinition<T>["clone"] = (name) => defineStruct(getProperties(), name ?? _name)
         .setSize(_size)
         .setAlign(_align) as any;
+    const offsetOf: StructDefinition<T>["offsetOf"] = (key, baseOffset) => {
+        const property = _properties.get(key as StructKey);
+        if (property) {
+            if (typeof baseOffset === "number") {
+                return property.offset + baseOffset;
+            }
+            return property.offset;
+        }
+        const keyString: string | number = typeof key === "symbol" ? `Symbol(${key.description || ""})` : key;
+        throw new Error(`[${typeDefinition.name}] There is no attribute named ${keyString}.`);
+    };
+    const sizeOf: StructDefinition<T>["sizeOf"] = (key) => {
+        const property = _properties.get(key as StructKey);
+        if (property) {
+            return property.type.size;
+        }
+        const keyString: string | number = typeof key === "symbol" ? `Symbol(${key.description || ""})` : key;
+        throw new Error(`[${typeDefinition.name}] There is no attribute named ${keyString}.`);
+    };
     const getter: OperationGetter<any> = ({ view, offset, littleEndian }) => {
         const structure: Record<StructKey, any> = {};
         for (const property of _propertyList) {
@@ -612,7 +646,7 @@ export function defineStruct<T extends Record<StructKey, any> = {}>(param0?: Str
         });
         cacheGetter(() => proxy);
         return proxy;
-    }
+    };
     const typeDefinition: StructDefinition<T> = {
         isTypeDefinition: TypeDefinitionSymbol,
         get name() {
@@ -636,6 +670,8 @@ export function defineStruct<T extends Record<StructKey, any> = {}>(param0?: Str
         get recordList() {
             return _recordList;
         },
+        offsetOf,
+        sizeOf,
         getter,
         setter,
         reactive,
