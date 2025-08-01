@@ -1,10 +1,10 @@
 # 介绍
 
-Enhanced DataView(EDataView) 是一个轻量级二进制数据操作库，基于严谨的 Typescript 编写，提供链式 API 进行类型定义和响应式数据操作。
+Enhanced DataView (==EDataView==) 是一个专为高效处理二进制数据而设计的轻量级操作库。该库采用强类型设计的 TypeScript 构建，提供直观的链式 API 用于声明式地定义数据结构与类型，并基于此定义实现对底层 DataView 的读写操作以及响应式数据绑定与转换。
 
 ## 什么是 EDataView?
 
-在 JavaScript 中操作 JSON 数据就如同呼吸一样简单。
+在 JavaScript 生态中，操作 JSON 格式的数据通常极为直观且简单，如同呼吸一般自然。
 
 ```typescript
 const person = {
@@ -13,10 +13,11 @@ const person = {
     friends: [2, 3, 4, 5]
 };
 // 很简单
+console.log(person.name); // MrKBear
 person.friends[1] = 6;
 ```
 
-如果面对的是一堆纯粹的二进制数据，想要正确操作 (读/写) 它们，事情就没那么简单了。
+然而，面对原始二进制数据缓冲区时，进行精确的读写操作则会变得异常复杂且容易出错。
 
 ```typescript
 const personBlob = new Uint8Array([
@@ -27,17 +28,20 @@ const personBlob = new Uint8Array([
 ]);
 ```
 
-> 如果能像操作 JSON 数据那样操作二进制数据，岂不美哉？
+> 试想：若能够如同操作 JSON 对象那样便捷地处理二进制数据，将为开发者带来极大的便利。
 
-EDataView 就是专为复杂二进制操作场景设计的，轻量化数据处理工具。
+==EDataView== 正是为解决此类复杂二进制操作场景而专门设计的轻量级数据处理工具库。
 
-使用 EDataView 我们可以将二进制缓冲区，转换为响应式的 JavaScript 对象 (`Proxy`)，对响应式对象的任何操作将直接作用于二进制数据。
+借助 EDataView，开发者可以将底层的二进制缓冲区（ArrayBuffer）转换为==响应式==的 JavaScript 对象（基于 Proxy 实现）。
 
 ```typescript
 const person = func_provided_by_EDataView(personBlob);
 // 很简单
+console.log(person.name); // MrKBear
 person.friends[1] = 6;
 ```
+
+对该响应式对象的任何属性访问或修改操作，都将被自动映射并直接作用于其底层的二进制数据源。
 
 ## 特色
 
@@ -49,11 +53,14 @@ person.friends[1] = 6;
 
 ## 贡献者
 
-- @MrKBear <mrkbear@qq.com,mrkbear@mrkbear.com>
+::: card title="@MrKBear"
+mrkbear@mrkbear.com
+:::
+
 
 感谢所有本项目的贡献者，支持者，以及看到这里的您。
 
-欢迎参与项目贡献！无论是提交 Pull Request、提出功能建议，还是报告遇到的问题，您的每份参与都将助力更棒的 EDataView。💪
+欢迎参与项目贡献！无论是提交 Pull Request、提出功能建议，还是报告遇到的问题，您的每份参与都将助力更棒的 EDataView。
 
 ## 许可证
 
