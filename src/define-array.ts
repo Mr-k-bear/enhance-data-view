@@ -389,3 +389,49 @@ export function defineArray<T>(param0?: TypeDefinition<T> | string, length?: num
     }
     return typeDefinition;
 }
+
+/**
+ * Reads array of typed data from DataView
+ * @param view - Source DataView
+ * @param type - Element type definition
+ * @param offset - Starting offset in bytes
+ * @param length - Number of elements to read
+ * @param littleEndian - Byte order (default: big-endian)
+ * @returns Array of decoded values
+ * @example 
+ * const coords = getArray(view, FLOAT, 0x20, 3);
+ */
+export function getArray<T>(view: DataView, type: TypeDefinition<T>, offset: number, length: number, littleEndian?: boolean): Array<T> {
+    const result = new Array<T>(length);
+    const size = type.size;
+    for (let i = 0; i < length; i++) {
+        result[i] = type.getter({
+            view,
+            offset: offset + size * i,
+            littleEndian
+        });
+    }
+    return result;
+}
+
+/**
+ * Writes array of typed data to DataView
+ * @param view - Target DataView
+ * @param type - Element type definition
+ * @param offset - Starting offset in bytes
+ * @param array - Values to encode
+ * @param littleEndian - Byte order (default: big-endian)
+ * @example 
+ * setArray(view, INT, 0x30, [1, 2, 3]);
+ */
+export function setArray<T>(view: DataView, type: TypeDefinition<T>, offset: number, array: ArrayLike<T>, littleEndian?: boolean): void {
+    const length = array.length;
+    const size = type.size;
+    for (let i = 0; i < length; i++) {
+        type.setter({
+            view,
+            offset: offset + size * i,
+            littleEndian
+        }, array[i]);
+    }
+}
