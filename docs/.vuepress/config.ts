@@ -62,6 +62,14 @@ export default defineUserConfig({
                                 "operation-reactive"
                             ],
                             collapsed: false
+                        },
+                        {
+                            text: "调用示例",
+                            prefix: "/zh/",
+                            items: [
+                                "demo-portable-executable"
+                            ],
+                            collapsed: false
                         }
                     ]
                 },
